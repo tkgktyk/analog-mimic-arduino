@@ -1,0 +1,14 @@
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+.Spotlight-V100
+.Trashes
+desktop.ini
+
+# PlatformIO (Safety Net)
+.pio/
+.pioenvs/
+.vscode/
+/examples/**/.gitignore
