@@ -35,7 +35,7 @@ namespace {
 static void calculateScaleAndShift(float inputVal, float* outFract, int8_t* outShift) {
     *outShift = 0;
     *outFract = inputVal;
-    while (fabs(*outFract) >= 1.0f && *outShift < 31) {
+    while (fabs(*outFract) >= 1.0f && *outShift < 16) {
         *outFract /= 2.0f;
         (*outShift)++;
     }
@@ -207,9 +207,10 @@ int16_t MimicBase::mvToRawSigned(int16_t mv) {
 }
 
 int16_t MimicBase::floatToQ15(float value) {
-    if (value >= 1.0f) return 32767;    
-    if (value <= -1.0f) return -32768;  
-    return (int16_t)(value * 32768.0f);
+    float s = roundf(value * 32768.0f);
+    if (s >  32767.0f) s =  32767.0f;
+    if (s < -32768.0f) s = -32768.0f;
+    return (int16_t)s;
 }
 
 void MimicBase::floatToPayloadQ15(float value, uint8_t* buffer, uint8_t offset) {
