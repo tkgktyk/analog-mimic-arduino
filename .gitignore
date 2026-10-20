@@ -10,5 +10,6 @@ desktop.ini
 # PlatformIO (Safety Net)
 .pio/
 .pioenvs/
-.vscode/
-/examples/**/.gitignore
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json

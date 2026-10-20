@@ -1,6 +1,6 @@
 /**
  ******************************************************************************
- * @file    Mimic.h
+ * @file    AnalogMimic.h
  * @author  TAKAGI Katsuyuki
  * @brief   Host-Side Helper Functions and Arduino Library API for 
  * Communicating with the Analog Mimic Hardware via I2C.
@@ -12,8 +12,8 @@
  ******************************************************************************
  */
 
-#ifndef MIMIC_H
-#define MIMIC_H
+#ifndef ANALOG_MIMIC_H
+#define ANALOG_MIMIC_H
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -254,17 +254,17 @@ public:
   void setMathIntegral(float timeConstantUs, int8_t inputShift = -2);
 
   /**
-   * @brief Configures a Half-Wave Rectifier.
+   * @brief Configures a Half-Wave Rectifier.s
    * @param polarity Positive or Negative half-wave to pass.
    * @param vrefMv Reference center voltage in mV.
    */
-  void setRectifierHalf(bool polarity = MIMIC_POLARITY_POSITIVE, uint16_t vrefMv = MIMIC_ADC_MID_VALUE);
+  void setRectifierHalf(uint16_t vrefMv, bool polarity = MIMIC_POLARITY_POSITIVE);
 
   /**
    * @brief Configures a Full-Wave Rectifier (Absolute value circuit).
    * @param vrefMv Reference center voltage in mV.
    */
-  void setRectifierFull(uint16_t vrefMv = MIMIC_ADC_MID_VALUE);
+  void setRectifierFull(uint16_t vrefMv);
 
   /**
    * @brief Configures a Slew Rate Limiter.
@@ -348,4 +348,4 @@ public:
   void setHardwareServoEnabled(bool enabled);
 };
 
-#endif // MIMIC_H
+#endif // ANALOG_MIMIC_H

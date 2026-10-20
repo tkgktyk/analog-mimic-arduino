@@ -1,5 +1,5 @@
 #include <Wire.h>
-#include <Mimic.h>
+#include <AnalogMimic.h>
 #include <FspTimer.h>
 
 // --- Hardware & Library Configuration ---

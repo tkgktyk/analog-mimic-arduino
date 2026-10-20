@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PIO: Build current example",
+      "type": "shell",
+      "command": "pio",
+      "windows": {
+        "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe"
+      },
+      "args": ["run", "-e", "current"],
+      "options": { "env": { "MIMIC_EXAMPLE": "${fileDirnameBasename}" } },
+      "group": "build",
+      "problemMatcher": ["$platformio"]
+    },
+    {
+      "label": "PIO: Upload current example",
+      "type": "shell",
+      "command": "pio",
+      "windows": {
+        "command": "${env:USERPROFILE}\\.platformio\\penv\\Scripts\\pio.exe"
+      },
+      "args": ["run", "-e", "current", "-t", "upload"],
+      "options": { "env": { "MIMIC_EXAMPLE": "${fileDirnameBasename}" } },
+      "group": "build",
+      "problemMatcher": ["$platformio"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 /**
  ******************************************************************************
- * @file    Mimic.cpp
+ * @file    AnalogMimic.cpp
  * @author  TAKAGI Katsuyuki
  * @brief   Implementation of Host-Side Helper Functions, I2C Command Packet 
  * Serialization, and Register-Mapping Wrapper APIs.
@@ -12,7 +12,7 @@
  ******************************************************************************
  */
 
-#include "Mimic.h"
+#include "AnalogMimic.h"
 #include <math.h>
 
 namespace {
@@ -519,7 +519,7 @@ void MimicBase::setMathIntegral(float timeConstantUs, int8_t inputShift) {
     writeModeAndPayload(MIMIC_MODE_ID_MATH_INTEGRAL, payload, 3);
 }
 
-void MimicBase::setRectifierHalf(bool polarity, uint16_t vrefMv) {
+void MimicBase::setRectifierHalf(uint16_t vrefMv, bool polarity) {
     // Half-wave rectification behaves similarly to an analog clipping circuit; delegate to setClipper
     if (polarity == MIMIC_POLARITY_NEGATIVE) setClipper(vrefMv, 0);
     else setClipper(_vdd_mv, vrefMv);

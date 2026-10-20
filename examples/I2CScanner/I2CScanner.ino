@@ -1,5 +1,5 @@
 #include <Wire.h>
-#include "Mimic.h"
+#include "AnalogMimic.h"
 
 // --- Constants ---
 const unsigned long SERIAL_BOOT_DELAY_MS = 3000;

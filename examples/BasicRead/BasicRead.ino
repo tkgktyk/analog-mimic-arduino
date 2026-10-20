@@ -1,5 +1,5 @@
 #include <Wire.h>
-#include <Mimic.h>
+#include <AnalogMimic.h>
 
 // Communication error status definition
 const uint8_t MIMIC_COMM_ERROR = 0xFF;
