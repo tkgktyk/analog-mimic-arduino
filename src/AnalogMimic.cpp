@@ -558,11 +558,12 @@ void MimicBase::setDigitalDelay(uint16_t delaySamples) {
  * @param gain Gain multiplier (e.g., 1.0023, 0.994).
  */
 void MimicBase::setGainCal(float gain) {
-    // 1. Convert float (multiplier) to a 16-bit unsigned Q15 fixed-point value (0 - 65535)
-    // Example: 1.0x -> 32768, 1.01x -> 33096
-    uint16_t gain_q15 = (uint16_t)(gain * 32768.0f);
+    // Convert to unsigned Q1.15 (1.0 -> 32768), rounded and clamped to 0 - 65535
+    float s = roundf(gain * 32768.0f);
+    if (s < 0.0f)     s = 0.0f;
+    if (s > 65535.0f) s = 65535.0f;
 
-    writeTwoBytes(MIMIC_REG_NVM_GAIN_Q15, gain_q15);
+    writeTwoBytes(MIMIC_REG_NVM_GAIN_Q15, (uint16_t)s);
 }
 
 /**
