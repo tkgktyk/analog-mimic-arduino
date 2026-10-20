@@ -255,8 +255,8 @@ public:
 
   /**
    * @brief Configures a Half-Wave Rectifier.s
-   * @param polarity Positive or Negative half-wave to pass.
    * @param vrefMv Reference center voltage in mV.
+   * @param polarity Positive or Negative half-wave to pass.
    */
   void setRectifierHalf(uint16_t vrefMv, bool polarity = MIMIC_POLARITY_POSITIVE);
 
