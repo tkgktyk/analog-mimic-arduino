@@ -106,6 +106,24 @@ for (uint8_t ch = 0; ch < 8; ch++) {
 }
 ```
 
+## Releases and Firmware Compatibility
+
+The library and the module firmware share the register map (`src/mimic_registers.h`).
+Use a library release together with firmware built within the range listed for it.
+
+| Library | Firmware build date | Notes |
+|---|---|---|
+| 0.1.0 | 20261025 or later | First release |
+
+Check the firmware of your module with `getBuildDate()`:
+
+```cpp
+Serial.println(mimic.getBuildDate(), HEX);   // e.g. 20261025
+```
+
+Firmware built outside the range does not work correctly with that release.
+Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic).
+
 ---
 
 ## Development with PlatformIO
