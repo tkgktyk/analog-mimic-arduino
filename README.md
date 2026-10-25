@@ -24,7 +24,7 @@ This library is fully compatible with the entire Analog Mimic ecosystem:
 ## Getting Started
 
 ### 1. Installation
-* **Via Arduino Library Manager (Recommended):** Search for `Analog Mimic` in the Arduino IDE Library Manager and click **Install**.
+* **Via Arduino Library Manager (Recommended):** Search for `AnalogMimic` in the Arduino IDE Library Manager and click **Install**.
 * **Manual Installation:** Download this repository as a `.zip` file, and import it via *Sketch -> Include Library -> Add .ZIP Library...*
 
 ### 2. Basic Usage
