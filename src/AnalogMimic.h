@@ -29,6 +29,12 @@ constexpr uint16_t MIMIC_VDD_5V  = 5000;
 // Filter Constants (Q-Factors)
 // =========================================================
 constexpr float MIMIC_FILTER_Q_BUTTERWORTH = 0.7071f;
+
+// Biquad (2nd-order) filter limits; fc relative to the current sampling rate
+constexpr float MIMIC_BIQUAD_FC_MIN_RATIO = 1.0e-5f;  // fs / 100000 (2 Hz at 200 kHz)
+constexpr float MIMIC_BIQUAD_FC_MAX_RATIO = 0.24f;    // just below fs / 4
+constexpr float MIMIC_BIQUAD_Q_MIN        = 0.1f;
+constexpr float MIMIC_BIQUAD_Q_MAX        = 10.0f;
 constexpr float MIMIC_FILTER_Q_BESSEL      = 0.5773f;
 constexpr float MIMIC_FILTER_Q_CHEBYSHEV   = 1.0f;
 
@@ -87,6 +93,19 @@ public:
    */
   uint16_t getCpuCycles();
 
+  /**
+   * @brief Reads the firmware build date.
+   * @return Date as hex 0xYYYYMMDD (e.g. 0x20261021); print with HEX to read it.
+   */
+  uint32_t getBuildDate();
+
+  /**
+   * @brief Reads the 32-bit unit ID (FNV-1a hash of the MCU unique ID).
+   * @return Unit ID. Fixed for each chip; different chips give different values
+   *         with high probability (not guaranteed unique).
+   */
+  uint32_t getUnitId();
+
   // --- Global Configurations (Pipeline Pre/Post-Processing) ---
 
   /**
@@ -101,13 +120,27 @@ public:
    */
   void setOutputInverted(bool inverted);
 
+  /**
+   * @brief Lowers the processing rate to 200 kHz / 2^N (input averaged, output interpolated).
+   *        Call before setting a mode: coefficients are calculated from this rate.
+   * @param N 0 (no decimation) to MIMIC_DECIMATION_N_MAX (16); larger values are clamped.
+   */
   void setDecimation(uint8_t N);
 
   /**
    * @brief Applies a manual DC offset to the output signal.
-   * @param offsetMv Offset voltage in millivolts (can be negative).
+   * @param offsetMv Offset voltage in millivolts (can be negative). Resolution: VDD / 32768.
    */
   void setOutputOffset(int16_t offsetMv);
+
+  /**
+   * @brief Sets the common reference voltage (Vref), the signal ground of the module.
+   * @param vrefMv Reference voltage in mV (0 to VDD). Defaults to VDD / 2 after begin().
+   * @note  Every mode with a signal center works around Vref: 1st LPF/HPF, Biquad, PGA,
+   *        envelope, derivative, integral and rectifiers. Vref is an input: changing it
+   *        does not reset the filter states (a slow HPF moves to the new Vref gradually).
+   */
+  void setVref(uint16_t vrefMv);
 
   // --- 0. Bypass DSP ---
 
@@ -133,6 +166,8 @@ public:
   /**
    * @brief Configures a Unity-Gain Biquad. Passes signal unchanged but consumes 
    * the exact same CPU cycles as other Biquad filters for profiling purposes.
+   * @note  All Biquad filters: fc is limited to fs / 100000 - 0.24 fs (2 Hz - 48 kHz at
+   *        200 kHz) and Q to 0.1 - 10. Values outside are clamped.
    */
   void setFilterBiquadUnity();
 
@@ -167,23 +202,29 @@ public:
   // --- 2. Programmable Gain Amplifier (PGA) ---
 
   /**
-   * @brief Configures the Programmable Gain Amplifier.
+   * @brief Configures the Programmable Gain Amplifier: out = Vref + gain * (in - Vref).
    * @param gain Linear gain multiplier (e.g., 5.5 for 5.5x amplification).
-   * @param refMv Reference voltage in mV for the amplification center (DC offset).
+   * @note  The amplification center is the common Vref (see setVref()).
    */
-  void setPGA(float gain, uint16_t refMv = 2500);
+  void setPGA(float gain);
 
-  // --- 3. Non-linear Amplifier ---
-
-  /**
-   * @brief Configures a Logarithmic Amplifier.
-   */
-  void setNonlinearLog();
+  // --- 3. Logarithmic / Antilogarithmic Amplifier ---
 
   /**
-   * @brief Configures an Exponential (Anti-Log) Amplifier.
+   * @brief Configures a Logarithmic Amplifier: out = Vref + slope * log10(in / unit).
+   * @param slopeMvPerDecade Output change per decade of the input in mV (negative = inverting).
+   * @param unitMv Input voltage (from 0 V) at which the output equals Vref.
+   * @note  The input is a magnitude measured from 0 V; inputs near 0 V saturate low.
    */
-  void setNonlinearAntilog();
+  void setLog(int16_t slopeMvPerDecade = 1000, uint16_t unitMv = 500);
+
+  /**
+   * @brief Configures an Antilogarithmic (exponential) Amplifier: out = unit * 10^((in - Vref) / slope).
+   * @param slopeMvPerDecade Input change per decade of the output in mV (same as setLog()).
+   * @param unitMv Output voltage (from 0 V) when the input equals Vref.
+   * @note  With the same Vref, slope and unit, setAntilog() is the inverse of setLog().
+   */
+  void setAntilog(int16_t slopeMvPerDecade = 1000, uint16_t unitMv = 500);
 
   // --- 4. Comparators ---
 
@@ -254,17 +295,16 @@ public:
   void setMathIntegral(float timeConstantUs, int8_t inputShift = -2);
 
   /**
-   * @brief Configures a Half-Wave Rectifier.s
-   * @param vrefMv Reference center voltage in mV.
-   * @param polarity Positive or Negative half-wave to pass.
+   * @brief Configures a Half-Wave Rectifier folding at the common Vref.
+   * @param polarity MIMIC_POLARITY_POSITIVE: max(in, Vref), MIMIC_POLARITY_NEGATIVE: min(in, Vref).
    */
-  void setRectifierHalf(uint16_t vrefMv, bool polarity = MIMIC_POLARITY_POSITIVE);
+  void setRectifierHalf(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
   /**
-   * @brief Configures a Full-Wave Rectifier (Absolute value circuit).
-   * @param vrefMv Reference center voltage in mV.
+   * @brief Configures a Full-Wave Rectifier (absolute value around Vref).
+   * @param polarity MIMIC_POLARITY_POSITIVE: Vref + |in - Vref|, MIMIC_POLARITY_NEGATIVE: Vref - |in - Vref|.
    */
-  void setRectifierFull(uint16_t vrefMv);
+  void setRectifierFull(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
   /**
    * @brief Configures a Slew Rate Limiter.
@@ -279,9 +319,17 @@ public:
    */
   void setDigitalDelay(uint16_t delaySamples);
 
+  /**
+   * @brief Sets the output gain calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param gain Gain multiplier (e.g., 1.0023). Stored as uq1_15 (0 to < 2.0).
+   */
   void setGainCal(float gain);
 
-  void setOffsetCal(int16_t offset);
+  /**
+   * @brief Sets the output offset calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param offsetLsb Offset in output LSB (e.g., -6.44). Stored as raw_fx3 (1/8 LSB).
+   */
+  void setOffsetCal(float offsetLsb);
 
   void commitCalibrationToNvm();
 
@@ -298,23 +346,24 @@ protected:
 
   // State retention variables
   uint8_t _global_flags;
-  int16_t _shift_raw;
+  int16_t _offset_raw_fx3;   // User output offset (raw_fx3)
   uint8_t _decimation_N;
 
   uint8_t readRegister8(uint8_t regAddr);
   uint16_t readRegister16(uint8_t regAddr);
+  uint32_t readRegister32(uint8_t regAddr);
 
   void writeModeAndPayload(uint8_t mode, const uint8_t *payload, uint8_t length);
   void writeOneByte(uint8_t addr, uint8_t value);
   void writeTwoBytes(uint8_t addr, uint16_t value);
 
-  uint16_t mvToRaw(uint16_t mv);
-  int16_t mvToRawSigned(int16_t mv);
-  int16_t floatToQ15(float value);
-  void floatToPayloadQ15(float value, uint8_t *buffer, uint8_t offset);
+  int16_t mvToRawFx3(int32_t mv);
+  void sendLog(uint8_t type, int16_t slopeMvPerDecade, uint16_t unitMv);
+  int16_t floatToQ0_15(float value);
+  void floatToPayloadQ0_15(float value, uint8_t *buffer, uint8_t offset);
   void rawToPayload16(uint16_t raw, uint8_t *buffer, uint8_t offset);
   void int16ToPayload(int32_t value, uint8_t *buffer, uint8_t offset);
-  void sendBiquadCoeffs_Normalized(float b0, float b1, float b2, float a0, float a1, float a2, uint8_t filterType);
+  void sendBiquad(uint8_t type, float fc, float Q);
 };
 
 // =========================================================

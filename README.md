@@ -28,26 +28,83 @@ This library is fully compatible with the entire Analog Mimic ecosystem:
 * **Manual Installation:** Download this repository as a `.zip` file, and import it via *Sketch -> Include Library -> Add .ZIP Library...*
 
 ### 2. Basic Usage
-Include the header and initialize the Mimic instance over your preferred Wire (I²C) interface:
+Include the header, create an instance with the module supply voltage, and call `begin()`:
 
 ```cpp
 #include <Wire.h>
 #include <AnalogMimic.h>
 
-// Create a Mimic instance (Default I2C address)
+// Module supply voltage in mV (MIMIC_VDD_5V, MIMIC_VDD_3V3 or a measured value)
 Mimic0x mimic(MIMIC_VDD_5V);
 
 void setup() {
     Wire.begin();
     mimic.begin(&Wire);
 
-    // Dynamic reconfiguration example: Set to Low-Pass Filter at 1.0 kHz
-    mimic.setFilter1stLPF(1000);
+    // 1st-order low-pass filter, fc = 1 kHz
+    mimic.setFilter1stLPF(1000.0f);
 }
 
 void loop() {
-    // Read runtime virtual telemetry / register status if needed
+    // The module keeps running on its own; change the settings at any time
 }
+```
+
+---
+
+## Things to Know Before Writing a Sketch
+
+The API reference is in [`src/AnalogMimic.h`](src/AnalogMimic.h). This section covers the behaviour that applies across all functions.
+
+### Voltages are relative to the supply (ratiometric)
+The module's ADC and DAC both use the module supply (VDD) as their reference. One LSB is `VDD / 4096`, so 0 V reads as 0 and VDD as 4096 (the highest code is 4095).
+
+Functions that take millivolts convert them using the supply voltage given to the constructor:
+
+```cpp
+Mimic0x mimic(MIMIC_VDD_5V);   // or MIMIC_VDD_3V3, or the measured value in mV, e.g. 4980
+```
+
+If the real supply differs from this value, all mV settings scale with it. Pass the measured supply voltage when absolute accuracy matters.
+
+### Absolute voltages and the common reference (Vref)
+* **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()` and the `unitMv` of `setLog()` / `setAntilog()`.
+* **Signal processing is centred on Vref.** Modes that have a signal centre work as `out = Vref + H(in - Vref)`: PGA, Biquad filters, rectifiers, envelope follower, log / antilog, derivative / integral.
+* Vref defaults to **VDD / 2** after `begin()`. Change it with `setVref(mV)` (for example, `setVref(0)` for a single-supply signal referenced to GND).
+* Changing Vref does not reset the state of filters and other modes, so the output moves smoothly, like an analog circuit whose reference has shifted.
+
+### Changing settings while running
+* The output keeps its previous value while a new setting is being applied.
+* The output is disconnected briefly only when the output route changes (analog output ↔ comparator digital output).
+* `begin()` resets the global settings (output flags, offset, decimation, Vref). It does not change the current mode or the calibration.
+
+### Sampling rate and decimation
+* The module samples at **200 kHz**. Functions that take a frequency or a time (filters, envelope follower, S&H, derivative / integral) calculate their coefficients from the current sampling rate.
+* `setDecimation(N)` lowers the processing rate to `200 kHz / 2^N` (N = 0 to 16), for long delays, slow S&H, long time constants or averaging. Input samples are averaged and the output is interpolated. The output continues from its current value when N is changed. **Call `setDecimation()` before setting a mode**; the coefficients are calculated when the mode is set.
+* **Biquad filters:** `fc` can be set from 1/100000 of the sampling rate (2 Hz at 200 kHz) to 0.24 of it, and `Q` from 0.1 to 10; values outside are clamped. Decimation is not needed for low cutoffs.
+
+### Calibration
+Each module is calibrated at production, and the gain and offset are stored in its flash memory. You normally do not need `setGainCal()`, `setOffsetCal()` or `commitCalibrationToNvm()`. Writing new values to NVM overwrites the factory calibration.
+
+### Firmware and library versions
+The register map is shared between the firmware and this library (`mimic_registers.h`), so use a library and firmware from the same period. `getBuildDate()` returns the firmware build date as `0xYYYYMMDD`:
+
+```cpp
+Serial.println(mimic.getBuildDate(), HEX);   // e.g. 20261021
+Serial.println(mimic.getUnitId(), HEX);      // ID of this module
+```
+
+### Reading the module output with the host ADC
+The module output has a series resistor. Many microcontroller ADCs assume a low source impedance, so a short sampling time can make readings slightly low (for example, about 0.2 % on the Arduino UNO R4). If you measure the output with the host ADC, lengthen the sampling time or buffer the signal.
+
+Example for the Arduino UNO R4 (RA4M1), called once after the first `analogRead()`:
+
+```cpp
+(void)analogRead(A1);            // Opens the ADC
+for (uint8_t ch = 0; ch < 8; ch++) {
+  R_ADC0->ADSSTR[ch] = 255;      // Longest sampling time (about 5.3 us)
+}
+```
 
 ---
 

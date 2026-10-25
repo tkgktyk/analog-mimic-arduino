@@ -26,11 +26,11 @@ void testFilterBqBPF()    { mimic.setFilterBiquadBPF(1000.0f); }
 void testFilterBqNotch()  { mimic.setFilterBiquadNotch(1000.0f); }
 
 // --- 2. PGA ---
-void testPGA()            { mimic.setPGA(2.0f, 2500); } // Gain x2, reference point 2.5V
+void testPGA()            { mimic.setPGA(2.0f); } // Gain x2, reference point 2.5V
 
 // --- 3. Nonlinear ---
-void testNonlinearLog()   { mimic.setNonlinearLog(); }      // No arguments (LUT specified only)
-void testNonlinearAlog()  { mimic.setNonlinearAntilog(); }  // No arguments (LUT specified only)
+void testNonlinearLog()   { mimic.setLog(1000, 500); }      // No arguments (LUT specified only)
+void testNonlinearAlog()  { mimic.setAntilog(1000, 500); }  // No arguments (LUT specified only)
 
 // --- 4. Comparators ---
 void testCompWindow()     { mimic.setComparatorWindow(3000, 2000); } // 3V and 2V window
@@ -44,8 +44,8 @@ void testClipper()        { mimic.setClipper(4000, 1000); } // Hard/Soft integra
 // --- 6. Math & Special (Digital Functions) ---
 void testMathDeriv()      { mimic.setMathDerivative(1.0f); }
 void testMathIntegral()   { mimic.setMathIntegral(1.0f); }
-void testRectHalf()       { mimic.setRectifierHalf(true, 2500); }
-void testRectFull()       { mimic.setRectifierFull(2500); }
+void testRectHalf()       { mimic.setRectifierHalf(); }
+void testRectFull()       { mimic.setRectifierFull(); }
 void testSlewRate()       { mimic.setSlewRateLimiter(0.1f); } // 10% change per sample
 void testSampleHold()     { mimic.setSampleAndHold(10.0f); } // Timebase: 10ms period S&H
 void testTrackHold()      { mimic.setTrackAndHold(10.0f, 0.5f); } // Timebase: 10ms period, 50% Track

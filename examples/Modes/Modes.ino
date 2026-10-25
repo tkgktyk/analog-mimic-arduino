@@ -29,7 +29,7 @@ const float TH_DUTY_CYCLE = 0.5;          // Track time ratio (0.0 to 1.0)
 const float VREF_MV = MIMIC_VDD_5V / 2;   // Center voltage reference for rectification
 const float SLEW_LIMIT_VAL = waveFreq/100000.0f;      // Maximum rate of change per sample
 const float ENVELOPE_TIME_US = waveFreq*10.0f;  // Decay time constant for envelope follower
-const uint16_t SCHMITT_HIGH_MV = 3000;    // Upper threshold for Schmitt trigger
+const uint16_t SCHMITT_HIGH_MV = 3000;    // Upper thresh1old for Schmitt trigger
 const uint16_t SCHMITT_LOW_MV = 2000;     // Lower threshold for Schmitt trigger
 
 // --- State Management ---
@@ -243,7 +243,7 @@ void setDemoMode(DemoMode mode) {
 
     case MODE_SINE_LOG_AMP:
       Serial.println("SINE  -> Log Amplifier: Logarithmic distortion via soft peak compression");
-      mimic.setNonlinearLog(); 
+      mimic.setLog(1000, 500); 
       break;
 
     case MODE_SINE_SCHMITT:
