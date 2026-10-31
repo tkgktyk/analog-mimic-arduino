@@ -20,10 +20,12 @@ void testOutputOffset()   { mimic.setBypassDSP(); mimic.setOutputOffset(1000); }
 // --- 1. Filtering (DC shift arguments are completely isolated) ---
 void testFilter1stLPF()   { mimic.setFilter1stLPF(1000.0f); }
 void testFilter1stHPF()   { mimic.setFilter1stHPF(1000.0f); }
+void testFilter1stAPF()   { mimic.setFilter1stAPF(1000.0f); }
 void testFilterBqLPF()    { mimic.setFilterBiquadLPF(1000.0f); }
 void testFilterBqHPF()    { mimic.setFilterBiquadHPF(1000.0f); }
 void testFilterBqBPF()    { mimic.setFilterBiquadBPF(1000.0f); }
 void testFilterBqNotch()  { mimic.setFilterBiquadNotch(1000.0f); }
+void testFilterBqAPF()    { mimic.setFilterBiquadAPF(1000.0f); }
 
 // --- 2. PGA ---
 void testPGA()            { mimic.setPGA(2.0f); } // Gain x2, reference point 2.5V
@@ -39,7 +41,8 @@ void testCompSchmitt()    { mimic.setComparatorSchmitt(3000, 2000); }
 // --- 5. Dynamics & Waveform ---
 void testPeakHold()       { mimic.setPeakHold(0); } // Positive polarity
 void testEnvelope()       { mimic.setEnvelopeFollower(50.0f, 0); } // 50ms decay, positive polarity
-void testClipper()        { mimic.setClipper(4000, 1000); } // Hard/Soft integrated (Upper 4V, Lower 1V)
+void testClipper()        { mimic.setClipper(4000, 1000); } // Hard clip (upper 4 V, lower 1 V)
+void testSoftClipper()    { mimic.setSoftClipper(4000, 1000); } // Soft clip (upper 4 V, lower 1 V)
 
 // --- 6. Math & Special (Digital Functions) ---
 void testMathDeriv()      { mimic.setMathDerivative(1.0f); }
@@ -64,10 +67,12 @@ const ModeTest testModes[] = {
   {"OUTPUT_OFFSET",      testOutputOffset},
   {"FILTER_1ST_LPF",     testFilter1stLPF},
   {"FILTER_1ST_HPF",     testFilter1stHPF},
+  {"FILTER_1ST_APF",     testFilter1stAPF},
   {"FILTER_BIQUAD_LPF",  testFilterBqLPF},
   {"FILTER_BIQUAD_HPF",  testFilterBqHPF},
   {"FILTER_BIQUAD_BPF",  testFilterBqBPF},
   {"FILTER_BIQUAD_NOTCH",testFilterBqNotch},
+  {"FILTER_BIQUAD_APF",  testFilterBqAPF},
   {"PGA",                testPGA},
   {"NONLINEAR_LOG",      testNonlinearLog},
   {"NONLINEAR_ANTILOG",  testNonlinearAlog},
@@ -76,6 +81,7 @@ const ModeTest testModes[] = {
   {"WAVE_PEAK_HOLD",     testPeakHold},
   {"WAVE_ENVELOPE",      testEnvelope},
   {"CLIPPER",            testClipper},
+  {"SOFT_CLIPPER",       testSoftClipper},
   {"MATH_DERIVATIVE",    testMathDeriv},
   {"MATH_INTEGRAL",      testMathIntegral},
   {"RECTIFIER_HALF",     testRectHalf},
