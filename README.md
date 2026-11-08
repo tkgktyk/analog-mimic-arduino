@@ -81,8 +81,10 @@ Voltages are converted with the supply voltage given to the constructor. If the 
 Inside the module, voltages are codes with 1/8 LSB resolution (`raw_fx3`, 1 code = VDD / 32768). `voltsToCode()` and `codeToVolts()` convert between them; `getAdcValue()` and `setVrefCode()` work with codes directly (for calibration and testing).
 
 ### Absolute voltages and the common reference (Vref)
-* **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()` and the `unitV` of `setLog()` / `setAntilog()`.
-* **Signal processing is centred on Vref.** Modes that have a signal centre work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, log / antilog, derivative / integral.
+* **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()`.
+* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, log, derivative / integral, oscillator.
+* **Magnitudes are output from 0 V:** `setAntilog()`, `setMathSquare()`, `setMathSqrt()`, `setMathRms()`. The analog stages cannot reach the supply rails (about 0.1 V from GND and VDD), so lift these outputs with `setOutputOffset()` when the bottom of the range matters.
+* **Chaining modules:** set the Vref of the next module to the output offset of the previous one, so that the offset cancels (for example, an antilog module with an offset of 0.2 V followed by a log module with `setVref(0.2f)`).
 * Vref defaults to **VDD / 2** after `begin()`. Change it with `setVref(volts)` (for example, `setVref(0.0f)` for a single-supply signal referenced to GND).
 * Changing Vref does not reset the state of filters and other modes, so the output moves smoothly, like an analog circuit whose reference has shifted.
 
@@ -129,7 +131,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
-| 0.2.0 | 20261031 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; new mode payloads |
+| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; square, square root, RMS and oscillator / VCO modes; log input relative to Vref; new mode payloads |
 | 0.1.0 | 20261025 - 20261030 | First release |
 
 Check the firmware of your module with `getBuildDate()`:
@@ -146,6 +148,7 @@ Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic).
 * `setSlewRateLimiter()` takes V/µs instead of a ratio per sample.
 * `setDecimation()` no longer changes the meaning of the settings: times and frequencies of the module are scaled by 2^N.
 * `setMathIntegral()`: the first argument is the leak time constant; 0 gives a pure integrator.
+* `setLog()`: the input is measured from Vref, not from 0 V. For a sensor whose zero is 0 V, call `setVref(0.0f)` first.
 * `getAdcValue()` returns a code with 1/8 LSB resolution (ADC code × 8); `getInputVolts()` returns volts.
 * The second constructor argument is the I²C address offset (0 - 3).
 
@@ -183,4 +186,4 @@ pio run                       # Build all examples
    custom_example = <Name>
 ```
    This is only required for command-line builds and `pio run`. The **Ctrl+Shift+B** tasks work without it.
-   
+   

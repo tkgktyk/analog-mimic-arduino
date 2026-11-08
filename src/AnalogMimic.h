@@ -56,6 +56,13 @@ constexpr float MIMIC_BIQUAD_Q_MAX     = 10.0f;
 // Delay line length
 constexpr uint16_t MIMIC_DELAY_SAMPLES_MAX = 4095;
 
+// Oscillator frequency limit (fs / 2)
+constexpr float MIMIC_OSC_FREQ_MAX_HZ = MIMIC_SAMPLING_HZ * 0.5f;
+
+// RMS averaging time constant limits (values outside are clamped)
+constexpr float MIMIC_RMS_TAU_MIN_US = 10.0f;          // 2 samples
+constexpr float MIMIC_RMS_TAU_MAX_US = 10.0e6f;        // 10 s
+
 // =========================================================
 // MimicBase (Core interface for all variants)
 // =========================================================
@@ -153,9 +160,11 @@ public:
   /**
    * @brief Sets the common reference voltage (Vref), the signal ground of the module.
    * @param vrefV Reference voltage in V (0 to VDD). Defaults to VDD / 2 after begin().
-   * @note  Every mode with a signal center works around Vref: 1st filters, Biquad, PGA,
-   *        envelope, derivative, integral and rectifiers. Vref is an input: changing it
-   *        does not reset the filter states (a slow HPF moves to the new Vref gradually).
+   * @note  Every input is taken relative to Vref: filters, PGA, envelope, rectifiers,
+   *        derivative, integral, square, square root, RMS, log / antilog and the VCO.
+   *        Vref is an input: changing it does not reset the filter states (a slow HPF
+   *        moves to the new Vref gradually). When modules are chained, set the Vref of the
+   *        next module to the output offset of the previous one.
    */
   void setVref(float vrefV);
 
@@ -223,10 +232,12 @@ public:
   // --- 3. Logarithmic / antilogarithmic amplifier ---
 
   /**
-   * @brief Logarithmic amplifier: out = Vref + slope * log10(in / unit).
+   * @brief Logarithmic amplifier: out = Vref + slope * log10((in - Vref) / unit).
    * @param slopeVPerDecade Output change per decade of the input in V (negative = inverting).
-   * @param unitV Input voltage (from 0 V) at which the output equals Vref.
-   * @note  The input is a magnitude measured from 0 V; inputs near 0 V saturate low.
+   * @param unitV Input above Vref at which the output equals Vref.
+   * @note  The input is a magnitude above Vref; inputs near or below Vref saturate low.
+   *        For a sensor whose zero is 0 V (a photodiode), call setVref(0.0f). After an
+   *        envelope follower module, use the same Vref in both modules.
    */
   void setLog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
 
@@ -234,7 +245,9 @@ public:
    * @brief Antilogarithmic (exponential) amplifier: out = unit * 10^((in - Vref) / slope).
    * @param slopeVPerDecade Input change per decade of the output in V (same as setLog()).
    * @param unitV Output voltage (from 0 V) when the input equals Vref.
-   * @note  With the same Vref, slope and unit, setAntilog() is the inverse of setLog().
+   * @note  The output is a magnitude from 0 V (lift it with setOutputOffset() if needed).
+   *        With the same slope and unit, setAntilog() is the inverse of setLog() when
+   *        the Vref of setLog() equals the output offset of setAntilog().
    */
   void setAntilog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
 
@@ -308,6 +321,34 @@ public:
   void setMathIntegral(float leakTimeConstantUs, int8_t inputShift = -2);
 
   /**
+   * @brief Squarer: out = (in - Vref)^2 / unit, a magnitude from 0 V.
+   *        Squaring a sine doubles its frequency; the output is also proportional to power.
+   * @param unitV Scale voltage, like the 10 V of an analog multiplier (> 0). 0 (default)
+   *        uses VDD / 4: an input of Vref +/- VDD / 2 gives VDD.
+   */
+  void setMathSquare(float unitV = 0.0f);
+
+  /**
+   * @brief Square rooter: out = sqrt((in - Vref) * unit), 0 below Vref, a magnitude from 0 V.
+   *        For a differential pressure sensor, set Vref to its zero output: the output is
+   *        proportional to the flow.
+   * @param unitV Scale voltage (> 0). 0 (default) uses VDD / 4. A squarer and a square
+   *        rooter with the same unit give |in - Vref| back.
+   */
+  void setMathSqrt(float unitV = 0.0f);
+
+  /**
+   * @brief True RMS converter: out = sqrt(mean((in - Vref)^2)), a magnitude from 0 V
+   *        (gain 1). Like the averaging capacitor of an RMS converter IC, the time
+   *        constant sets the trade-off between the ripple at low frequencies and the
+   *        response time.
+   * @param averagingTimeUs Averaging time constant in us
+   *        (MIMIC_RMS_TAU_MIN_US - MIMIC_RMS_TAU_MAX_US).
+   * @note  Use it without decimation: decimation averages the input before the DSP.
+   */
+  void setMathRms(float averagingTimeUs);
+
+  /**
    * @brief Half-wave rectifier folding at Vref.
    * @param polarity MIMIC_POLARITY_POSITIVE: max(in, Vref), MIMIC_POLARITY_NEGATIVE: min(in, Vref).
    */
@@ -331,6 +372,26 @@ public:
    * @param delaySamples Delay in samples (0 - MIMIC_DELAY_SAMPLES_MAX); 1 sample = 5 us.
    */
   void setDigitalDelay(uint16_t delaySamples);
+
+  // --- 8. Oscillator (input not used, except the VCO) ---
+
+  /**
+   * @brief Sine oscillator: out = Vref + amplitude * sin(2 pi f t).
+   * @param freqHz Frequency in Hz (0 - MIMIC_OSC_FREQ_MAX_HZ). 0 gives a constant Vref
+   *        (a voltage source set by setVref()).
+   * @param amplitudeV Peak amplitude in V.
+   * @note  The phase continues when the frequency or the amplitude is changed.
+   */
+  void setOscillator(float freqHz, float amplitudeV);
+
+  /**
+   * @brief Voltage-controlled oscillator (sine): f = f0 + k * (in - Vref), limited to
+   *        0 - MIMIC_OSC_FREQ_MAX_HZ (linear FM; put an antilog module in front for 1 V/oct).
+   * @param centerFreqHz Frequency f0 in Hz when the input equals Vref.
+   * @param hzPerVolt Sensitivity k in Hz/V (negative: the frequency falls as the input rises).
+   * @param amplitudeV Peak amplitude in V.
+   */
+  void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV);
 
   // --- Calibration (output gain and offset, stored in the module's flash) ---
 
@@ -377,6 +438,8 @@ protected:
   void sendLog(uint8_t type, float slopeVPerDecade, float unitV);
   void sendComparator(uint8_t type, float upperV, float lowerV);
   void sendClipper(uint8_t type, float upperV, float lowerV);
+  void sendMathUnit(uint8_t type, float unitV);
+  void sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt);
 };
 
 // =========================================================

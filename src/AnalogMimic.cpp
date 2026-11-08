@@ -459,6 +459,39 @@ void MimicBase::setMathIntegral(float leakTimeConstantUs, int8_t inputShift) {
     writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 5);
 }
 
+// --- Square, square root, RMS ---
+
+// Payload: [0] type, [1-2] unit raw_fx3 (> 0)
+void MimicBase::sendMathUnit(uint8_t type, float unitV) {
+    if (!(unitV > 0.0f)) unitV = _vdd_v * 0.25f;   // default: VDD / 4
+    int16_t unit = voltsToCode(unitV);
+    if (unit < 1) unit = 1;
+
+    uint8_t payload[3];
+    payload[0] = type;
+    put16(payload, 1, unit);
+    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 3);
+}
+
+void MimicBase::setMathSquare(float unitV) { sendMathUnit(MIMIC_MATH_SQUARE, unitV); }
+void MimicBase::setMathSqrt(float unitV)   { sendMathUnit(MIMIC_MATH_SQRT, unitV); }
+
+// Payload: [0] type, [1-2] 1 - a mant12, [3] 1 - a shift (13 - 32: 1 - a < 0.5)
+void MimicBase::setMathRms(float averagingTimeUs) {
+    averagingTimeUs = clampf(averagingTimeUs, MIMIC_RMS_TAU_MIN_US, MIMIC_RMS_TAU_MAX_US);
+    float c = decayComplement(averagingTimeUs);
+    if (c > 0.49f) c = 0.49f;
+    uint16_t mant;
+    uint8_t  shift;
+    toMant12Shift(c, 12, &mant, &shift, 32);
+
+    uint8_t payload[4];
+    payload[0] = MIMIC_MATH_RMS;
+    put16(payload, 1, mant);
+    payload[3] = shift;
+    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 4);
+}
+
 // --- Rectifiers ---
 
 void MimicBase::setRectifierHalf(uint8_t polarity) {
@@ -490,6 +523,43 @@ void MimicBase::setDigitalDelay(uint16_t delaySamples) {
     uint8_t payload[2];
     put16(payload, 0, delaySamples);
     writeModeAndPayload(MIMIC_MODE_ID_DELAY, payload, 2);
+}
+
+// --- Oscillator ---
+
+// Payload: [0] type, [1-4] phase increment (f = inc * fs / 2^32), [5-6] amplitude raw_fx3,
+// [7-8] VCO gain mant int16, [9] VCO gain exp int8: phase increment per raw_fx3 of input
+void MimicBase::sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt) {
+    const float incPerHz = 4294967296.0f / MIMIC_SAMPLING_HZ;
+    float inc = roundf(clampf(freqHz, 0.0f, MIMIC_OSC_FREQ_MAX_HZ) * incPerHz);
+    if (inc > 2147483647.0f) inc = 2147483647.0f;
+    uint32_t incU = (uint32_t)inc;
+    int16_t amp = voltsToCode(amplitudeV);
+    if (amp < 0) amp = 0;
+
+    // k = mant * 2^exp (phase increment per raw_fx3), |mant| in 16384 - 32767 when possible
+    float k = hzPerVolt * incPerHz * _vdd_v / (float)((MIMIC_ADC_MAX_VALUE + 1) << MIMIC_RAW_FX3_FRAC_BITS);
+    int8_t exp = 0;
+    while (fabs(k) > 32767.0f && exp < 4) { k *= 0.5f; exp++; }
+    while (k != 0.0f && fabs(k) < 16384.0f && exp > -16) { k *= 2.0f; exp--; }
+    float mant = clampf(roundf(k), -32768.0f, 32767.0f);
+
+    uint8_t payload[10];
+    payload[0] = type;
+    put16(payload, 1, (int32_t)(incU >> 16));
+    put16(payload, 3, (int32_t)(incU & 0xFFFF));
+    put16(payload, 5, amp);
+    put16(payload, 7, (int32_t)mant);
+    payload[9] = (uint8_t)exp;
+    writeModeAndPayload(MIMIC_MODE_ID_OSCILLATOR, payload, 10);
+}
+
+void MimicBase::setOscillator(float freqHz, float amplitudeV) {
+    sendOscillator(MIMIC_OSC_SINE, freqHz, amplitudeV, 0.0f);
+}
+
+void MimicBase::setVco(float centerFreqHz, float hzPerVolt, float amplitudeV) {
+    sendOscillator(MIMIC_OSC_VCO, centerFreqHz, amplitudeV, hzPerVolt);
 }
 
 // -------------------------------------------------------------
