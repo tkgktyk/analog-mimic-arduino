@@ -387,14 +387,14 @@ void MimicBase::setEnvelopeFollower(float decayTimeUs, uint8_t polarity) {
     toMant12Shift(c, 12, &mant, &shift, 40);
 
     uint8_t payload[4];
-    put16(payload, 0, mant);
-    payload[2] = polarity;
+    payload[0] = polarity;
+    put16(payload, 1, mant);
     payload[3] = shift;
     writeModeAndPayload(MIMIC_MODE_ID_ENVELOPE_FOLLOWER, payload, 4);
 }
 
 void MimicBase::setPeakHold(uint8_t polarity) {
-    uint8_t payload[4] = { 0, 0, polarity, 12 };   // 1 - decay = 0: holds the peak
+    uint8_t payload[4] = { polarity, 0, 0, 12 };   // 1 - decay = 0: holds the peak
     writeModeAndPayload(MIMIC_MODE_ID_ENVELOPE_FOLLOWER, payload, 4);
 }
 
@@ -428,6 +428,7 @@ void MimicBase::sendClipper(uint8_t type, float upperV, float lowerV) {
 
 void MimicBase::setClipper(float upperV, float lowerV)     { sendClipper(MIMIC_CLIPPER_HARD, upperV, lowerV); }
 void MimicBase::setSoftClipper(float upperV, float lowerV) { sendClipper(MIMIC_CLIPPER_SOFT, upperV, lowerV); }
+void MimicBase::setDeadZone(float upperV, float lowerV)    { sendClipper(MIMIC_CLIPPER_DEAD_ZONE, upperV, lowerV); }
 
 // --- Integrator / differentiator ---
 
@@ -558,7 +559,7 @@ void MimicBase::setDigitalDelay(uint16_t delaySamples) {
 
 // Payload: [0] type, [1-4] phase increment (f = inc * fs / 2^32), [5-6] amplitude raw_fx3,
 // [7-8] VCO gain mant int16, [9] VCO gain exp int8: phase increment per raw_fx3 of input
-void MimicBase::sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt) {
+void MimicBase::sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt, uint8_t waveform) {
     const float incPerHz = 4294967296.0f / MIMIC_SAMPLING_HZ;
     float inc = roundf(clampf(freqHz, 0.0f, MIMIC_OSC_FREQ_MAX_HZ) * incPerHz);
     if (inc > 2147483647.0f) inc = 2147483647.0f;
@@ -573,22 +574,23 @@ void MimicBase::sendOscillator(uint8_t type, float freqHz, float amplitudeV, flo
     while (k != 0.0f && fabs(k) < 16384.0f && exp > -16) { k *= 2.0f; exp--; }
     float mant = clampf(roundf(k), -32768.0f, 32767.0f);
 
-    uint8_t payload[10];
+    uint8_t payload[11];
     payload[0] = type;
-    put16(payload, 1, (int32_t)(incU >> 16));
-    put16(payload, 3, (int32_t)(incU & 0xFFFF));
-    put16(payload, 5, amp);
-    put16(payload, 7, (int32_t)mant);
-    payload[9] = (uint8_t)exp;
-    writeModeAndPayload(MIMIC_MODE_ID_OSCILLATOR, payload, 10);
+    payload[1] = waveform;
+    put16(payload, 2, (int32_t)(incU >> 16));
+    put16(payload, 4, (int32_t)(incU & 0xFFFF));
+    put16(payload, 6, amp);
+    put16(payload, 8, (int32_t)mant);
+    payload[10] = (uint8_t)exp;
+    writeModeAndPayload(MIMIC_MODE_ID_OSCILLATOR, payload, 11);
 }
 
-void MimicBase::setOscillator(float freqHz, float amplitudeV) {
-    sendOscillator(MIMIC_OSC_SINE, freqHz, amplitudeV, 0.0f);
+void MimicBase::setOscillator(float freqHz, float amplitudeV, uint8_t waveform) {
+    sendOscillator(MIMIC_OSC_FIXED, freqHz, amplitudeV, 0.0f, waveform);
 }
 
-void MimicBase::setVco(float centerFreqHz, float hzPerVolt, float amplitudeV) {
-    sendOscillator(MIMIC_OSC_VCO, centerFreqHz, amplitudeV, hzPerVolt);
+void MimicBase::setVco(float centerFreqHz, float hzPerVolt, float amplitudeV, uint8_t waveform) {
+    sendOscillator(MIMIC_OSC_VCO, centerFreqHz, amplitudeV, hzPerVolt, waveform);
 }
 
 // -------------------------------------------------------------

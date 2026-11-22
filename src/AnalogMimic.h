@@ -371,13 +371,17 @@ protected:
   // --- Signal sources (input not used, except the VCO) ---
 
   /**
-   * @brief Sine oscillator: out = Vref + amplitude * sin(2 pi f t).
+   * @brief Oscillator (function generator): out = Vref + amplitude * wave(2 pi f t).
    * @param freqHz Frequency in Hz (0 - MIMIC_OSC_FREQ_MAX_HZ). 0 gives a constant Vref
    *        (a voltage source set by setVref()).
    * @param amplitudeV Peak amplitude in V.
-   * @note  The phase continues when the frequency or the amplitude is changed.
+   * @param waveform MIMIC_OSC_WAVE_SINE (default), _TRIANGLE, _SQUARE or _SAWTOOTH. Every
+   *        waveform starts at Vref and rises; the square is high in the first half period.
+   * @note  The phase continues when the frequency, the amplitude or the waveform is changed.
+   *        The square and the sawtooth jump within one sample, so their harmonics above
+   *        fs / 2 fold back (alias); this is small at low frequencies.
    */
-  void setOscillator(float freqHz, float amplitudeV);
+  void setOscillator(float freqHz, float amplitudeV, uint8_t waveform = MIMIC_OSC_WAVE_SINE);
 
   /**
    * @brief Voltage-controlled oscillator (sine): f = f0 + k * (in - Vref), limited to
@@ -385,10 +389,12 @@ protected:
    * @param centerFreqHz Frequency f0 in Hz when the input equals Vref.
    * @param hzPerVolt Sensitivity k in Hz/V (negative: the frequency falls as the input rises).
    * @param amplitudeV Peak amplitude in V.
+   * @param waveform MIMIC_OSC_WAVE_* (default: sine), as for setOscillator().
    */
-  void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV);
+  void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV,
+              uint8_t waveform = MIMIC_OSC_WAVE_SINE);
 
-  // --- Nonlinear: logarithm, multiplier, true RMS ---
+  // --- Nonlinear: logarithm, multiplier, true RMS, dead zone ---
 
   /**
    * @brief Logarithmic amplifier: out = Vref + slope * log10((in - Vref) / unit).
@@ -441,6 +447,14 @@ protected:
    */
   void setTrueRms(float averagingTimeUs);
 
+  /**
+   * @brief Dead zone (a diode dead-band circuit): Vref while the input is between the
+   *        limits, and Vref + (in - limit) beyond a limit (slope 1, no step). Small signals
+   *        and noise around the center are removed; larger ones pass shifted by the limit.
+   * @param upperV Upper limit in V. @param lowerV Lower limit in V (absolute, like setClipper()).
+   */
+  void setDeadZone(float upperV, float lowerV);
+
   uint8_t _i2c_addr;
   TwoWire *_wire;
   float _vdd_v;
@@ -465,7 +479,7 @@ protected:
   void sendClipper(uint8_t type, float upperV, float lowerV);
   void sendIntegrator(uint8_t type, float k, float c);
   void sendMultiplier(uint8_t type, float unitV);
-  void sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt);
+  void sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt, uint8_t waveform);
 };
 
 // =========================================================

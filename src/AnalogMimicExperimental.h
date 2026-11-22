@@ -43,12 +43,13 @@ public:
   using Base::setOscillator;
   using Base::setVco;
 
-  // Nonlinear: logarithm, multiplier, true RMS
+  // Nonlinear: logarithm, multiplier, true RMS, dead zone
   using Base::setLog;
   using Base::setAntilog;
   using Base::setSquarer;
   using Base::setSquareRooter;
   using Base::setTrueRms;
+  using Base::setDeadZone;
 };
 
 #endif // ANALOG_MIMIC_EXPERIMENTAL_H
