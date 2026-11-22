@@ -59,9 +59,12 @@ constexpr uint16_t MIMIC_DELAY_SAMPLES_MAX = 4095;
 // Oscillator frequency limit (fs / 2)
 constexpr float MIMIC_OSC_FREQ_MAX_HZ = MIMIC_SAMPLING_HZ * 0.5f;
 
-// RMS averaging time constant limits (values outside are clamped)
-constexpr float MIMIC_RMS_TAU_MIN_US = 10.0f;          // 2 samples
-constexpr float MIMIC_RMS_TAU_MAX_US = 10.0e6f;        // 10 s
+// Time constant limits (values outside are clamped)
+constexpr float MIMIC_TRUE_RMS_TIME_MIN_US       = 10.0f;     // 2 samples
+constexpr float MIMIC_TRUE_RMS_TIME_MAX_US       = 10.0e6f;   // 10 s
+constexpr float MIMIC_INTEGRATOR_TIME_MIN_US     = 5.0f;      // 1 sample
+constexpr float MIMIC_INTEGRATOR_TIME_MAX_US     = 10.0e6f;   // 10 s (integration and leak)
+constexpr float MIMIC_DIFFERENTIATOR_TIME_MAX_US = 10.0e6f;   // 10 s (differentiation and limit)
 
 // =========================================================
 // MimicBase (Core interface for all variants)
@@ -304,49 +307,62 @@ public:
    */
   void setSoftClipper(float upperV, float lowerV);
 
-  // --- 7. Differentiator / integrator, rectifiers, slew rate, delay ---
+  // --- 7. Integrator / differentiator, multiplier, true RMS, rectifiers, slew rate, delay ---
 
   /**
-   * @brief Differentiator: out = Vref + tau * d(in)/dt.
-   * @param timeConstantUs Time constant tau (RC of the differentiator) in us.
+   * @brief Integrator, like an op-amp integrator (input R, feedback C):
+   *        out = Vref + (1 / tau_i) * integral of (in - Vref) dt. A leak (a resistor across
+   *        the capacitor) makes it a 1st-order low-pass with a DC gain of leak / integration
+   *        time, and keeps it from drifting to the limit.
+   * @param integrationTimeUs Integration time constant tau_i (R_in * C) in us: a constant
+   *        input of 1 V moves the output by 1 V every tau_i
+   *        (MIMIC_INTEGRATOR_TIME_MIN_US - MIMIC_INTEGRATOR_TIME_MAX_US).
+   * @param leakTimeUs Leak time constant (R_leak * C) in us; 0 (default): no leak.
    */
-  void setMathDerivative(float timeConstantUs);
+  void setIntegrator(float integrationTimeUs, float leakTimeUs = 0.0f);
 
   /**
-   * @brief Leaky integrator (integrator with a resistor across the capacitor).
-   * @param leakTimeConstantUs Time constant of the leak in us; 0 gives a pure integrator.
-   * @param inputShift Input scale 2^inputShift (<= 1): every sample (5 us) the output moves
-   *        by (in - Vref) * 2^inputShift, i.e. an integration time of 5 us * 2^-inputShift.
+   * @brief Differentiator, like an op-amp differentiator (input C, feedback R) with a
+   *        resistor in series with the capacitor: out = Vref + tau_d * d(in)/dt for changes
+   *        slower than the limit time, and a gain of tau_d / limit above it (it does not
+   *        amplify noise without bound).
+   * @param differentiationTimeUs Differentiation time constant tau_d (R_f * C) in us
+   *        (up to MIMIC_DIFFERENTIATOR_TIME_MAX_US).
+   * @param limitTimeUs Band-limit time constant (R_series * C) in us; 10 us (default) is
+   *        about 16 kHz. 0: no limit (the difference of two samples).
    */
-  void setMathIntegral(float leakTimeConstantUs, int8_t inputShift = -2);
+  void setDifferentiator(float differentiationTimeUs, float limitTimeUs = 10.0f);
 
   /**
-   * @brief Squarer: out = (in - Vref)^2 / unit, a magnitude from 0 V.
+   * @brief Squarer (an analog multiplier with both inputs tied):
+   *        out = (in - Vref)^2 / unit, a magnitude from 0 V.
    *        Squaring a sine doubles its frequency; the output is also proportional to power.
    * @param unitV Scale voltage, like the 10 V of an analog multiplier (> 0). 0 (default)
    *        uses VDD / 4: an input of Vref +/- VDD / 2 gives VDD.
    */
-  void setMathSquare(float unitV = 0.0f);
+  void setSquarer(float unitV = 0.0f);
 
   /**
-   * @brief Square rooter: out = sqrt((in - Vref) * unit), 0 below Vref, a magnitude from 0 V.
+   * @brief Square rooter (an analog multiplier in the feedback of an op-amp):
+   *        out = sqrt((in - Vref) * unit), 0 below Vref, a magnitude from 0 V.
    *        For a differential pressure sensor, set Vref to its zero output: the output is
    *        proportional to the flow.
    * @param unitV Scale voltage (> 0). 0 (default) uses VDD / 4. A squarer and a square
    *        rooter with the same unit give |in - Vref| back.
    */
-  void setMathSqrt(float unitV = 0.0f);
+  void setSquareRooter(float unitV = 0.0f);
 
   /**
-   * @brief True RMS converter: out = sqrt(mean((in - Vref)^2)), a magnitude from 0 V
+   * @brief True RMS-to-DC converter: out = sqrt(mean((in - Vref)^2)), a magnitude from 0 V
    *        (gain 1). Like the averaging capacitor of an RMS converter IC, the time
    *        constant sets the trade-off between the ripple at low frequencies and the
    *        response time.
    * @param averagingTimeUs Averaging time constant in us
-   *        (MIMIC_RMS_TAU_MIN_US - MIMIC_RMS_TAU_MAX_US).
-   * @note  Use it without decimation: decimation averages the input before the DSP.
+   *        (MIMIC_TRUE_RMS_TIME_MIN_US - MIMIC_TRUE_RMS_TIME_MAX_US).
+   * @note  Use it without decimation: decimation averages the input before the DSP, and
+   *        the processing does not fit in one sample period.
    */
-  void setMathRms(float averagingTimeUs);
+  void setTrueRms(float averagingTimeUs);
 
   /**
    * @brief Half-wave rectifier folding at Vref.
@@ -438,7 +454,8 @@ protected:
   void sendLog(uint8_t type, float slopeVPerDecade, float unitV);
   void sendComparator(uint8_t type, float upperV, float lowerV);
   void sendClipper(uint8_t type, float upperV, float lowerV);
-  void sendMathUnit(uint8_t type, float unitV);
+  void sendIntegrator(uint8_t type, float k, float c);
+  void sendMultiplier(uint8_t type, float unitV);
   void sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt);
 };
 

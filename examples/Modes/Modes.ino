@@ -251,7 +251,7 @@ void setDemoMode(DemoMode mode) {
     case MODE_SINE_LOG_AMP:
       Serial.println("SINE  -> Log Amplifier (Vref = 0 V): Logarithmic compression of the peaks");
       mimic.setVref(0.0f);     // the input is a magnitude above Vref: measure it from 0 V
-      mimic.setLog(1.0f, 2.5f);
+      mimic.setLog(2.0f, 1.0f);
       break;
 
     case MODE_SINE_SCHMITT:
@@ -261,12 +261,12 @@ void setDemoMode(DemoMode mode) {
 
     case MODE_SINE_SQUARE:
       Serial.println("SINE  -> Squarer: Doubles the frequency (sin^2), output from 0 V");
-      mimic.setMathSquare();
+      mimic.setSquarer();
       break;
 
     case MODE_SINE_RMS:
       Serial.println("SINE  -> True RMS converter (20 ms): DC output = amplitude / sqrt(2)");
-      mimic.setMathRms(RMS_TAU_US);
+      mimic.setTrueRms(RMS_TAU_US);
       break;
 
     case MODE_OSCILLATOR:

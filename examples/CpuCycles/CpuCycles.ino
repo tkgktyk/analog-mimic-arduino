@@ -1,23 +1,28 @@
+/**
+ * CpuCycles: peak CPU cycles of the module's sampling ISR for every mode.
+ *
+ * One sample period is 360 cycles (72 MHz / 200 kHz); about 60 - 70 cycles must be
+ * left for the I2C interrupt and the main loop. For each mode the sketch prints:
+ *   Transition: peak while the new setting is written over I2C
+ *   Steady    : peak during 1 s without I2C traffic (the load of the mode itself)
+ *   Deadline  : MISS if a sample was not finished in time during that 1 s
+ *               (MIMIC_STATUS_DEADLINE_MISS; older firmware always shows ok)
+ * The whole list runs twice: without decimation and with decimation N = 1.
+ */
 #include <Wire.h>
 #include <AnalogMimic.h>
 
-// --- Constants ---
-const uint8_t MIMIC_COMM_ERROR = 0xFF;
+Mimic0x mimic(MIMIC_VDD_5V);
 
-// Create an instance of Mimic0x (5V Operation)
-Mimic0x mimic(MIMIC_VDD_5V); 
+constexpr uint16_t CYCLE_BUDGET = 360;
 
 // =========================================================
-// Wrapper Functions for Test Execution
-// (Compliant with the latest refined API specifications)
+// Modes (arguments in V, us, Hz, V/us)
 // =========================================================
-
-// --- 0. Bypass & Common ---
 void testBypassDSP()      { mimic.setBypassDSP(); }
-void testDelay()          { mimic.setDigitalDelay(50); } // 50 samples delay
-void testOutputOffset()   { mimic.setBypassDSP(); mimic.setOutputOffset(1000); } // Shift +1000mV
+void testDelay()          { mimic.setDigitalDelay(50); }                 // 50 samples
+void testOutputOffset()   { mimic.setBypassDSP(); mimic.setOutputOffset(0.5f); }
 
-// --- 1. Filtering (DC shift arguments are completely isolated) ---
 void testFilter1stLPF()   { mimic.setFilter1stLPF(1000.0f); }
 void testFilter1stHPF()   { mimic.setFilter1stHPF(1000.0f); }
 void testFilter1stAPF()   { mimic.setFilter1stAPF(1000.0f); }
@@ -27,161 +32,144 @@ void testFilterBqBPF()    { mimic.setFilterBiquadBPF(1000.0f); }
 void testFilterBqNotch()  { mimic.setFilterBiquadNotch(1000.0f); }
 void testFilterBqAPF()    { mimic.setFilterBiquadAPF(1000.0f); }
 
-// --- 2. PGA ---
-void testPGA()            { mimic.setPGA(2.0f); } // Gain x2, reference point 2.5V
+void testPGA()            { mimic.setPGA(2.0f); }
 
-// --- 3. Nonlinear ---
-void testNonlinearLog()   { mimic.setLog(1000, 500); }      // No arguments (LUT specified only)
-void testNonlinearAlog()  { mimic.setAntilog(1000, 500); }  // No arguments (LUT specified only)
+void testLog()            { mimic.setLog(1.0f, 0.5f); }                  // 1 V/decade, unit 0.5 V
+void testAntilog()        { mimic.setAntilog(1.0f, 0.5f); }
 
-// --- 4. Comparators ---
-void testCompWindow()     { mimic.setComparatorWindow(3000, 2000); } // 3V and 2V window
-void testCompSchmitt()    { mimic.setComparatorSchmitt(3000, 2000); }
+void testCompWindow()     { mimic.setComparatorWindow(3.0f, 2.0f); }
+void testCompSchmitt()    { mimic.setComparatorSchmitt(3.0f, 2.0f); }
 
-// --- 5. Dynamics & Waveform ---
-void testPeakHold()       { mimic.setPeakHold(0); } // Positive polarity
-void testEnvelope()       { mimic.setEnvelopeFollower(50.0f, 0); } // 50ms decay, positive polarity
-void testClipper()        { mimic.setClipper(4000, 1000); } // Hard clip (upper 4 V, lower 1 V)
-void testSoftClipper()    { mimic.setSoftClipper(4000, 1000); } // Soft clip (upper 4 V, lower 1 V)
+void testPeakHold()       { mimic.setPeakHold(MIMIC_POLARITY_POSITIVE); }
+void testEnvelope()       { mimic.setEnvelopeFollower(50000.0f); }       // 50 ms decay
+void testClipper()        { mimic.setClipper(4.0f, 1.0f); }
+void testSoftClipper()    { mimic.setSoftClipper(4.0f, 1.0f); }
 
-// --- 6. Math & Special (Digital Functions) ---
-void testMathDeriv()      { mimic.setMathDerivative(1.0f); }
-void testMathIntegral()   { mimic.setMathIntegral(1.0f); }
+void testDifferentiator() { mimic.setDifferentiator(100.0f); }           // tau_d 100 us, limit 10 us
+void testIntegrator()     { mimic.setIntegrator(1000.0f); }              // tau_i 1 ms, no leak
+void testIntegratorLeak() { mimic.setIntegrator(1000.0f, 100000.0f); }   // leak 100 ms
+void testSquarer()        { mimic.setSquarer(); }
+void testSquareRooter()   { mimic.setSquareRooter(); }
+void testTrueRms()        { mimic.setTrueRms(20000.0f); }                // 20 ms averaging
 void testRectHalf()       { mimic.setRectifierHalf(); }
 void testRectFull()       { mimic.setRectifierFull(); }
-void testSlewRate()       { mimic.setSlewRateLimiter(0.1f); } // 10% change per sample
-void testSampleHold()     { mimic.setSampleAndHold(10.0f); } // Timebase: 10ms period S&H
-void testTrackHold()      { mimic.setTrackAndHold(10.0f, 0.5f); } // Timebase: 10ms period, 50% Track
+void testSlewRate()       { mimic.setSlewRateLimiter(0.01f); }           // 0.01 V/us
+void testSampleHold()     { mimic.setSampleAndHold(100.0f); }            // 100 Hz
+void testTrackHold()      { mimic.setTrackAndHold(100.0f, 0.5f); }
 
-// =========================================================
-// Test Scenario Definition (Array of Function Pointers)
-// =========================================================
+void testOscillator()     { mimic.setOscillator(1000.0f, 1.0f); }        // 1 kHz, 1 V
+void testVco()            { mimic.setVco(1000.0f, 1000.0f, 1.0f); }      // 1 kHz + 1 kHz/V
+
 struct ModeTest {
-  const char* modeName;
-  void (*setModeFunc)();
+  const char *name;
+  void (*set)();
 };
 
 const ModeTest testModes[] = {
-  {"BYPASS_DSP",         testBypassDSP},
-  {"DELAY",              testDelay},
-  {"OUTPUT_OFFSET",      testOutputOffset},
-  {"FILTER_1ST_LPF",     testFilter1stLPF},
-  {"FILTER_1ST_HPF",     testFilter1stHPF},
-  {"FILTER_1ST_APF",     testFilter1stAPF},
-  {"FILTER_BIQUAD_LPF",  testFilterBqLPF},
-  {"FILTER_BIQUAD_HPF",  testFilterBqHPF},
-  {"FILTER_BIQUAD_BPF",  testFilterBqBPF},
-  {"FILTER_BIQUAD_NOTCH",testFilterBqNotch},
-  {"FILTER_BIQUAD_APF",  testFilterBqAPF},
-  {"PGA",                testPGA},
-  {"NONLINEAR_LOG",      testNonlinearLog},
-  {"NONLINEAR_ANTILOG",  testNonlinearAlog},
-  {"COMPARATOR_WIN",     testCompWindow},
-  {"COMPARATOR_SCHMITT", testCompSchmitt},
-  {"WAVE_PEAK_HOLD",     testPeakHold},
-  {"WAVE_ENVELOPE",      testEnvelope},
-  {"CLIPPER",            testClipper},
-  {"SOFT_CLIPPER",       testSoftClipper},
-  {"MATH_DERIVATIVE",    testMathDeriv},
-  {"MATH_INTEGRAL",      testMathIntegral},
-  {"RECTIFIER_HALF",     testRectHalf},
-  {"RECTIFIER_FULL",     testRectFull},
-  {"SLEW_RATE_LIMITER",  testSlewRate},
-  {"SAMPLE_AND_HOLD",    testSampleHold},
-  {"TRACK_AND_HOLD",     testTrackHold}
+  {"BYPASS_DSP",          testBypassDSP},
+  {"DELAY",               testDelay},
+  {"OUTPUT_OFFSET",       testOutputOffset},
+  {"FILTER_1ST_LPF",      testFilter1stLPF},
+  {"FILTER_1ST_HPF",      testFilter1stHPF},
+  {"FILTER_1ST_APF",      testFilter1stAPF},
+  {"FILTER_BIQUAD_LPF",   testFilterBqLPF},
+  {"FILTER_BIQUAD_HPF",   testFilterBqHPF},
+  {"FILTER_BIQUAD_BPF",   testFilterBqBPF},
+  {"FILTER_BIQUAD_NOTCH", testFilterBqNotch},
+  {"FILTER_BIQUAD_APF",   testFilterBqAPF},
+  {"PGA",                 testPGA},
+  {"LOG",                 testLog},
+  {"ANTILOG",             testAntilog},
+  {"COMPARATOR_WINDOW",   testCompWindow},
+  {"COMPARATOR_SCHMITT",  testCompSchmitt},
+  {"PEAK_HOLD",           testPeakHold},
+  {"ENVELOPE",            testEnvelope},
+  {"CLIPPER",             testClipper},
+  {"SOFT_CLIPPER",        testSoftClipper},
+  {"DIFFERENTIATOR",      testDifferentiator},
+  {"INTEGRATOR",          testIntegrator},
+  {"INTEGRATOR_LEAK",     testIntegratorLeak},
+  {"SQUARER",             testSquarer},
+  {"SQUARE_ROOTER",       testSquareRooter},
+  {"TRUE_RMS",            testTrueRms},
+  {"RECTIFIER_HALF",      testRectHalf},
+  {"RECTIFIER_FULL",      testRectFull},
+  {"SLEW_RATE_LIMITER",   testSlewRate},
+  {"SAMPLE_AND_HOLD",     testSampleHold},
+  {"TRACK_AND_HOLD",      testTrackHold},
+  {"OSCILLATOR",          testOscillator},
+  {"VCO",                 testVco},
 };
 const size_t NUM_MODES = sizeof(testModes) / sizeof(testModes[0]);
 
-void setup() {
+static void printHex32(uint32_t v)
+{
+  for (int8_t shift = 28; shift >= 0; shift -= 4) {
+    Serial.print((v >> shift) & 0xF, HEX);
+  }
+}
+
+void setup()
+{
   Serial.begin(115200);
   Wire.begin();
+  delay(2000);  // Time to open the serial monitor
+  Serial.println(F("\n=== Analog Mimic CPU Cycle Profiler ==="));
 
-  // Wait briefly for Serial Monitor to open
-  delay(2000);
-  Serial.println("\n=== Analog Mimic CPU Cycle Profiler ===");
-  Serial.println("Running on fully refined DSP Architecture v2.0");
-
-  // Initialize the library
-  if (!mimic.begin(&Wire)) {
-    Serial.println("Error: Could not initialize Mimic Library.");
-    while (1);
-  }
-  Serial.println("Mimic Library Initialized.");
-  
-  // Read status via the library
-  uint8_t status = mimic.getStatus();
-  if (status == MIMIC_COMM_ERROR) {
-    Serial.println("Mimic: Communication Error.");
-    while (1);
-  }
-
-  Serial.print("Mimic Status: 0x");
-  Serial.println(status, HEX);
-  
-  if (status & MIMIC_STATUS_SYSTEM_READY) {
-    Serial.println("Mimic: System Ready!");
-  }
-
-  // Read initial CPU cycles immediately after boot (Bypass mode) to reset peak
-  uint16_t initialCycles = mimic.getCpuCycles();
-  Serial.print("Initial Boot-up Max Cycles: ");
-  Serial.println(initialCycles);
-  Serial.println("---------------------------------------");
-
-  mimic.setOutputOpen(false);
-}
-
-void profile() {
-  for (size_t i = 0; i < NUM_MODES; i++) {
-    Serial.print("Testing Mode: ");
-    Serial.println(testModes[i].modeName);
-
-    // 1. Change mode and parameters (Triggers I2C communication)
-    testModes[i].setModeFunc();
-    delay(100);
-
-    uint8_t status = mimic.getStatus(); 
-    Serial.print("Mimic Status: 0x");
-    Serial.println(status, HEX);
-
-    // Read status flags from registration mode select
-    uint8_t flags = mimic.getOneByte(MIMIC_REG_MODE_ID); 
-    Serial.print("Mimic MODE: 0x");
-    Serial.println(flags, HEX);
-
-    // 2. Read CPU cycles immediately after mode transition
-    // Measures how high the maximum cycle is pushed by I2C interrupt blocking
-    uint16_t transitionCycles = mimic.getCpuCycles();
-
-    // 3. Wait 1 second for the DSP to stabilize in the new mode
-    // During this 1 second (~100,000 ADC interrupts), the pure peak load of the new mode is measured
+  // Retry until the module answers (e.g. it is inserted after the sketch started)
+  while (!mimic.begin(&Wire)) {
+    Serial.println(F("Mimic not found (WHO_AM_I). Check the connection; retrying..."));
+    Wire.end();   // A bus disturbed by inserting the module can leave Wire stuck
+    Wire.begin();
     delay(1000);
-
-    // 4. Read CPU cycles after 1 second (Pure steady-state load of the new mode)
-    uint16_t steadyCycles = mimic.getCpuCycles();
-
-    // Display Results
-    Serial.print("  -> Transition/I2C Max Cycles: ");
-    Serial.println(transitionCycles);
-    Serial.print("  -> Steady State Max Cycles  : ");
-    Serial.println(steadyCycles);
-
-    Serial.println("---------------------------------------");
-
-    // Reset common configurations (Delay/Offset) before the next test scenario
-    mimic.setOutputOffset(0);
-    delay(100);
   }
+  Serial.print(F("Firmware build: ")); printHex32(mimic.getBuildDate());
+  Serial.print(F("  Unit ID: "));      printHex32(mimic.getUnitId());
+  Serial.println();
+  Serial.print(F("Budget: ")); Serial.print(CYCLE_BUDGET);
+  Serial.println(F(" cycles per sample (leave about 60 - 70 for I2C and the main loop)"));
 
-  // Complete profiling loop execution
-  Serial.println("\n=== Profiling Complete ===");
+  (void)mimic.getCpuCycles();   // Clear the start-up peak
+  Serial.println(F("---------------------------------------"));
 }
 
-void loop() {
+static void profile()
+{
+  Serial.println(F("mode                  transition  steady  deadline"));
+  for (size_t i = 0; i < NUM_MODES; i++) {
+    testModes[i].set();
+    delay(100);
+    uint16_t transition = mimic.getCpuCycles();   // Peak including the I2C writes above
+
+    (void)mimic.getStatus();                       // Clear the error flags of the transition
+    delay(1000);                                   // No I2C traffic: load of the mode itself
+    uint16_t steady = mimic.getCpuCycles();
+    bool miss = (mimic.getStatus() & MIMIC_STATUS_DEADLINE_MISS) != 0;
+
+    char line[56];
+    snprintf(line, sizeof(line), "%-20s  %10u  %6u  %s", testModes[i].name, transition, steady,
+             miss ? "MISS" : "ok");
+    Serial.println(line);
+
+    mimic.setOutputOffset(0.0f);   // Reset the offset of OUTPUT_OFFSET
+    delay(100);
+  }
+}
+
+void loop()
+{
   mimic.setDecimation(0);
+  Serial.println(F("\n=== Decimation N = 0 ==="));
   profile();
+
   mimic.setDecimation(1);
-  Serial.println("\n=== Second Profiling (Decimation=1) ===");
+  Serial.println(F("\n=== Decimation N = 1 ==="));
   profile();
-  while (1); 
+
+  mimic.setDecimation(0);
+  mimic.setBypassDSP();
+  Serial.println(F("\n=== Profiling complete ==="));
+  while (true) {
+    delay(1000);
+  }
 }

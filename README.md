@@ -67,7 +67,7 @@ Every function uses the same units, chosen like the datasheet of the analog part
 | Quantity | Unit | Examples |
 |---|---|---|
 | Voltage | V (`float`) | `setVref(2.5f)`, `setComparatorSchmitt(3.0f, 2.0f)`, `setLog(1.0f, 0.5f)` |
-| Time | µs | `setEnvelopeFollower(50000.0f)` (50 ms), `setMathDerivative(100.0f)` |
+| Time | µs | `setEnvelopeFollower(50000.0f)` (50 ms), `setIntegrator(1000.0f, 100000.0f)` |
 | Frequency | Hz | `setFilterBiquadLPF(1000.0f)`, `setSampleAndHold(500.0f)` |
 | Slew rate | V/µs | `setSlewRateLimiter(0.01f)` |
 | Gain, Q, ratios | none | `setPGA(2.0f)`, `setFilterBiquadBPF(1000.0f, 5.0f)` |
@@ -82,8 +82,8 @@ Inside the module, voltages are codes with 1/8 LSB resolution (`raw_fx3`, 1 code
 
 ### Absolute voltages and the common reference (Vref)
 * **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()`.
-* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, log, derivative / integral, oscillator.
-* **Magnitudes are output from 0 V:** `setAntilog()`, `setMathSquare()`, `setMathSqrt()`, `setMathRms()`. The analog stages cannot reach the supply rails (about 0.1 V from GND and VDD), so lift these outputs with `setOutputOffset()` when the bottom of the range matters.
+* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, log, integrator / differentiator, oscillator.
+* **Magnitudes are output from 0 V:** `setAntilog()`, `setSquarer()`, `setSquareRooter()`, `setTrueRms()`. The analog stages cannot reach the supply rails (about 0.1 V from GND and VDD), so lift these outputs with `setOutputOffset()` when the bottom of the range matters.
 * **Chaining modules:** set the Vref of the next module to the output offset of the previous one, so that the offset cancels (for example, an antilog module with an offset of 0.2 V followed by a log module with `setVref(0.2f)`).
 * Vref defaults to **VDD / 2** after `begin()`. Change it with `setVref(volts)` (for example, `setVref(0.0f)` for a single-supply signal referenced to GND).
 * Changing Vref does not reset the state of filters and other modes, so the output moves smoothly, like an analog circuit whose reference has shifted.
@@ -131,7 +131,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
-| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; square, square root, RMS and oscillator / VCO modes; log input relative to Vref; new mode payloads |
+| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants, squarer, square rooter, true RMS and oscillator / VCO modes; log input relative to Vref; new mode payloads |
 | 0.1.0 | 20261025 - 20261030 | First release |
 
 Check the firmware of your module with `getBuildDate()`:
@@ -147,7 +147,7 @@ Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic).
 * **Voltages are in V, not mV:** the constructor (`Mimic0x mimic(5.0f)`, or `MIMIC_VDD_5V`, which is now 5.0f) and every voltage argument. A sketch that still passes mV compiles, so check every call: `setVref(2500)` must become `setVref(2.5f)`.
 * `setSlewRateLimiter()` takes V/µs instead of a ratio per sample.
 * `setDecimation()` no longer changes the meaning of the settings: times and frequencies of the module are scaled by 2^N.
-* `setMathIntegral()`: the first argument is the leak time constant; 0 gives a pure integrator.
+* `setMathDerivative()` and `setMathIntegral()` are replaced by `setDifferentiator(differentiationTimeUs, limitTimeUs)` and `setIntegrator(integrationTimeUs, leakTimeUs)`, which take the time constants of the analog circuit in µs.
 * `setLog()`: the input is measured from Vref, not from 0 V. For a sensor whose zero is 0 V, call `setVref(0.0f)` first.
 * `getAdcValue()` returns a code with 1/8 LSB resolution (ADC code × 8); `getInputVolts()` returns volts.
 * The second constructor argument is the I²C address offset (0 - 3).

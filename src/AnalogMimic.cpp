@@ -429,40 +429,68 @@ void MimicBase::sendClipper(uint8_t type, float upperV, float lowerV) {
 void MimicBase::setClipper(float upperV, float lowerV)     { sendClipper(MIMIC_CLIPPER_HARD, upperV, lowerV); }
 void MimicBase::setSoftClipper(float upperV, float lowerV) { sendClipper(MIMIC_CLIPPER_SOFT, upperV, lowerV); }
 
-// --- Differentiator / integrator ---
+// --- Integrator / differentiator ---
 
-// Payload: [0] type, [1-2] scale mant q0_15, [3] scale exp; scale = tau * fs
-void MimicBase::setMathDerivative(float timeConstantUs) {
-    float mant;
-    int8_t exp;
-    calculateMantExp(timeConstantUs * 1.0e-6f * MIMIC_SAMPLING_HZ, &mant, &exp);
-
-    uint8_t payload[4];
-    payload[0] = MIMIC_MATH_DERIVATIVE;
-    put16(payload, 1, floatToQ0_15(mant));
-    payload[3] = (uint8_t)exp;
-    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 4);
+// value = mant / 2^15 * 2^exp with mant in [2^14, 2^15) (value > 0)
+static void toQ15MantExp(float value, int16_t *mant, int8_t *exp) {
+    int e = 0;
+    if (value > 0.0f) {
+        while (value >= 1.0f && e < 60)  { value *= 0.5f; e++; }
+        while (value < 0.5f  && e > -60) { value *= 2.0f; e--; }
+    }
+    long m = (long)roundf(value * 32768.0f);
+    if (m > 32767) m = 32767;
+    if (m < 0) m = 0;
+    *mant = (int16_t)m;
+    *exp  = (int8_t)e;
 }
 
-// Payload: [0] type, [1-2] 1 - leak mant12, [3] input shift, [4] 1 - leak shift (0 = no leak)
-void MimicBase::setMathIntegral(float leakTimeConstantUs, int8_t inputShift) {
-    uint16_t mant = 0;
-    uint8_t  shift = 12;
-    if (leakTimeConstantUs > 0.0f) toMant12Shift(decayComplement(leakTimeConstantUs), 12, &mant, &shift, 40);
-    if (inputShift > 1) inputShift = 1;
+// Payload: [0] type, [1-2] K mant q0_15, [3] K exp, [4-5] c mant12, [6] c shift (0: none).
+// Per sample the module computes m += c * (K * u - m) (u = in - Vref, or its difference
+// for the differentiator); with c = 0 the integrator adds K * u.
+void MimicBase::sendIntegrator(uint8_t type, float k, float c) {
+    int16_t  kMant;
+    int8_t   kExp;
+    uint16_t cMant  = 0;
+    uint8_t  cShift = 0;
+    toQ15MantExp(k, &kMant, &kExp);
+    if (c > 0.0f) toMant12Shift(c, 12, &cMant, &cShift, 32);
 
-    uint8_t payload[5];
-    payload[0] = MIMIC_MATH_INTEGRAL;
-    put16(payload, 1, mant);
-    payload[3] = (uint8_t)inputShift;
-    payload[4] = shift;
-    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 5);
+    uint8_t payload[7];
+    payload[0] = type;
+    put16(payload, 1, kMant);
+    payload[3] = (uint8_t)kExp;
+    put16(payload, 4, cMant);
+    payload[6] = cShift;
+    writeModeAndPayload(MIMIC_MODE_ID_INTEGRATOR, payload, 7);
 }
 
-// --- Square, square root, RMS ---
+void MimicBase::setIntegrator(float integrationTimeUs, float leakTimeUs) {
+    integrationTimeUs = clampf(integrationTimeUs, MIMIC_INTEGRATOR_TIME_MIN_US, MIMIC_INTEGRATOR_TIME_MAX_US);
+    float g = 1.0e6f / (MIMIC_SAMPLING_HZ * integrationTimeUs);   // Ts / tau_i (<= 1)
+    if (leakTimeUs > 0.0f) {
+        leakTimeUs = clampf(leakTimeUs, MIMIC_INTEGRATOR_TIME_MIN_US, MIMIC_INTEGRATOR_TIME_MAX_US);
+        float c = decayComplement(leakTimeUs);
+        sendIntegrator(MIMIC_INTEGRATOR_INTEGRATOR, g / c, c);    // K = DC gain
+    } else {
+        sendIntegrator(MIMIC_INTEGRATOR_INTEGRATOR, g, 0.0f);     // no leak
+    }
+}
+
+void MimicBase::setDifferentiator(float differentiationTimeUs, float limitTimeUs) {
+    differentiationTimeUs = clampf(differentiationTimeUs, 0.0f, MIMIC_DIFFERENTIATOR_TIME_MAX_US);
+    float k = differentiationTimeUs * 1.0e-6f * MIMIC_SAMPLING_HZ;  // tau_d * fs
+    float c = 0.0f;                                                 // 0: no limit (c = 1)
+    if (limitTimeUs > 0.0f) {
+        c = decayComplement(clampf(limitTimeUs, 0.0f, MIMIC_DIFFERENTIATOR_TIME_MAX_US));
+    }
+    sendIntegrator(MIMIC_INTEGRATOR_DIFFERENTIATOR, k, c);
+}
+
+// --- Multiplier: squarer, square rooter ---
 
 // Payload: [0] type, [1-2] unit raw_fx3 (> 0)
-void MimicBase::sendMathUnit(uint8_t type, float unitV) {
+void MimicBase::sendMultiplier(uint8_t type, float unitV) {
     if (!(unitV > 0.0f)) unitV = _vdd_v * 0.25f;   // default: VDD / 4
     int16_t unit = voltsToCode(unitV);
     if (unit < 1) unit = 1;
@@ -470,26 +498,27 @@ void MimicBase::sendMathUnit(uint8_t type, float unitV) {
     uint8_t payload[3];
     payload[0] = type;
     put16(payload, 1, unit);
-    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 3);
+    writeModeAndPayload(MIMIC_MODE_ID_MULTIPLIER, payload, 3);
 }
 
-void MimicBase::setMathSquare(float unitV) { sendMathUnit(MIMIC_MATH_SQUARE, unitV); }
-void MimicBase::setMathSqrt(float unitV)   { sendMathUnit(MIMIC_MATH_SQRT, unitV); }
+void MimicBase::setSquarer(float unitV)      { sendMultiplier(MIMIC_MULTIPLIER_SQUARER, unitV); }
+void MimicBase::setSquareRooter(float unitV) { sendMultiplier(MIMIC_MULTIPLIER_SQUARE_ROOTER, unitV); }
 
-// Payload: [0] type, [1-2] 1 - a mant12, [3] 1 - a shift (13 - 32: 1 - a < 0.5)
-void MimicBase::setMathRms(float averagingTimeUs) {
-    averagingTimeUs = clampf(averagingTimeUs, MIMIC_RMS_TAU_MIN_US, MIMIC_RMS_TAU_MAX_US);
+// --- True RMS ---
+
+// Payload: [0-1] 1 - a mant12, [2] 1 - a shift (13 - 32: 1 - a < 0.5)
+void MimicBase::setTrueRms(float averagingTimeUs) {
+    averagingTimeUs = clampf(averagingTimeUs, MIMIC_TRUE_RMS_TIME_MIN_US, MIMIC_TRUE_RMS_TIME_MAX_US);
     float c = decayComplement(averagingTimeUs);
     if (c > 0.49f) c = 0.49f;
     uint16_t mant;
     uint8_t  shift;
     toMant12Shift(c, 12, &mant, &shift, 32);
 
-    uint8_t payload[4];
-    payload[0] = MIMIC_MATH_RMS;
-    put16(payload, 1, mant);
-    payload[3] = shift;
-    writeModeAndPayload(MIMIC_MODE_ID_MATH, payload, 4);
+    uint8_t payload[3];
+    put16(payload, 0, mant);
+    payload[2] = shift;
+    writeModeAndPayload(MIMIC_MODE_ID_TRUE_RMS, payload, 3);
 }
 
 // --- Rectifiers ---
