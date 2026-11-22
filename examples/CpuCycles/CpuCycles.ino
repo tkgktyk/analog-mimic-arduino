@@ -20,7 +20,6 @@ constexpr uint16_t CYCLE_BUDGET = 360;
 // Modes (arguments in V, us, Hz, V/us)
 // =========================================================
 void testBypassDSP()      { mimic.setBypassDSP(); }
-void testDelay()          { mimic.setDigitalDelay(50); }                 // 50 samples
 void testOutputOffset()   { mimic.setBypassDSP(); mimic.setOutputOffset(0.5f); }
 
 void testFilter1stLPF()   { mimic.setFilter1stLPF(1000.0f); }
@@ -34,9 +33,6 @@ void testFilterBqAPF()    { mimic.setFilterBiquadAPF(1000.0f); }
 
 void testPGA()            { mimic.setPGA(2.0f); }
 
-void testLog()            { mimic.setLog(1.0f, 0.5f); }                  // 1 V/decade, unit 0.5 V
-void testAntilog()        { mimic.setAntilog(1.0f, 0.5f); }
-
 void testCompWindow()     { mimic.setComparatorWindow(3.0f, 2.0f); }
 void testCompSchmitt()    { mimic.setComparatorSchmitt(3.0f, 2.0f); }
 
@@ -48,17 +44,8 @@ void testSoftClipper()    { mimic.setSoftClipper(4.0f, 1.0f); }
 void testDifferentiator() { mimic.setDifferentiator(100.0f); }           // tau_d 100 us, limit 10 us
 void testIntegrator()     { mimic.setIntegrator(1000.0f); }              // tau_i 1 ms, no leak
 void testIntegratorLeak() { mimic.setIntegrator(1000.0f, 100000.0f); }   // leak 100 ms
-void testSquarer()        { mimic.setSquarer(); }
-void testSquareRooter()   { mimic.setSquareRooter(); }
-void testTrueRms()        { mimic.setTrueRms(20000.0f); }                // 20 ms averaging
 void testRectHalf()       { mimic.setRectifierHalf(); }
 void testRectFull()       { mimic.setRectifierFull(); }
-void testSlewRate()       { mimic.setSlewRateLimiter(0.01f); }           // 0.01 V/us
-void testSampleHold()     { mimic.setSampleAndHold(100.0f); }            // 100 Hz
-void testTrackHold()      { mimic.setTrackAndHold(100.0f, 0.5f); }
-
-void testOscillator()     { mimic.setOscillator(1000.0f, 1.0f); }        // 1 kHz, 1 V
-void testVco()            { mimic.setVco(1000.0f, 1000.0f, 1.0f); }      // 1 kHz + 1 kHz/V
 
 struct ModeTest {
   const char *name;
@@ -67,7 +54,6 @@ struct ModeTest {
 
 const ModeTest testModes[] = {
   {"BYPASS_DSP",          testBypassDSP},
-  {"DELAY",               testDelay},
   {"OUTPUT_OFFSET",       testOutputOffset},
   {"FILTER_1ST_LPF",      testFilter1stLPF},
   {"FILTER_1ST_HPF",      testFilter1stHPF},
@@ -78,8 +64,6 @@ const ModeTest testModes[] = {
   {"FILTER_BIQUAD_NOTCH", testFilterBqNotch},
   {"FILTER_BIQUAD_APF",   testFilterBqAPF},
   {"PGA",                 testPGA},
-  {"LOG",                 testLog},
-  {"ANTILOG",             testAntilog},
   {"COMPARATOR_WINDOW",   testCompWindow},
   {"COMPARATOR_SCHMITT",  testCompSchmitt},
   {"PEAK_HOLD",           testPeakHold},
@@ -89,16 +73,8 @@ const ModeTest testModes[] = {
   {"DIFFERENTIATOR",      testDifferentiator},
   {"INTEGRATOR",          testIntegrator},
   {"INTEGRATOR_LEAK",     testIntegratorLeak},
-  {"SQUARER",             testSquarer},
-  {"SQUARE_ROOTER",       testSquareRooter},
-  {"TRUE_RMS",            testTrueRms},
   {"RECTIFIER_HALF",      testRectHalf},
   {"RECTIFIER_FULL",      testRectFull},
-  {"SLEW_RATE_LIMITER",   testSlewRate},
-  {"SAMPLE_AND_HOLD",     testSampleHold},
-  {"TRACK_AND_HOLD",      testTrackHold},
-  {"OSCILLATOR",          testOscillator},
-  {"VCO",                 testVco},
 };
 const size_t NUM_MODES = sizeof(testModes) / sizeof(testModes[0]);
 

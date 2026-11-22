@@ -66,12 +66,10 @@ Every function uses the same units, chosen like the datasheet of the analog part
 
 | Quantity | Unit | Examples |
 |---|---|---|
-| Voltage | V (`float`) | `setVref(2.5f)`, `setComparatorSchmitt(3.0f, 2.0f)`, `setLog(1.0f, 0.5f)` |
+| Voltage | V (`float`) | `setVref(2.5f)`, `setComparatorSchmitt(3.0f, 2.0f)`, `setClipper(4.0f, 1.0f)` |
 | Time | µs | `setEnvelopeFollower(50000.0f)` (50 ms), `setIntegrator(1000.0f, 100000.0f)` |
-| Frequency | Hz | `setFilterBiquadLPF(1000.0f)`, `setSampleAndHold(500.0f)` |
-| Slew rate | V/µs | `setSlewRateLimiter(0.01f)` |
+| Frequency | Hz | `setFilterBiquadLPF(1000.0f)`, `setFilter1stHPF(10.0f)` |
 | Gain, Q, ratios | none | `setPGA(2.0f)`, `setFilterBiquadBPF(1000.0f, 5.0f)` |
-| Delay | samples (1 sample = 5 µs) | `setDigitalDelay(100)` |
 
 ### Voltages are relative to the supply (ratiometric)
 The module's ADC and DAC both use the module supply (VDD) as their reference. One LSB is `VDD / 4096`, so 0 V reads as 0 and VDD as 4096 (the highest code is 4095).
@@ -82,9 +80,8 @@ Inside the module, voltages are codes with 1/8 LSB resolution (`raw_fx3`, 1 code
 
 ### Absolute voltages and the common reference (Vref)
 * **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()`.
-* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, log, integrator / differentiator, oscillator.
-* **Magnitudes are output from 0 V:** `setAntilog()`, `setSquarer()`, `setSquareRooter()`, `setTrueRms()`. The analog stages cannot reach the supply rails (about 0.1 V from GND and VDD), so lift these outputs with `setOutputOffset()` when the bottom of the range matters.
-* **Chaining modules:** set the Vref of the next module to the output offset of the previous one, so that the offset cancels (for example, an antilog module with an offset of 0.2 V followed by a log module with `setVref(0.2f)`).
+* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, integrator / differentiator.
+* **Chaining modules:** set the Vref of the next module to the level that the previous module outputs for a zero signal (its Vref plus its output offset), so that the offset cancels.
 * Vref defaults to **VDD / 2** after `begin()`. Change it with `setVref(volts)` (for example, `setVref(0.0f)` for a single-supply signal referenced to GND).
 * Changing Vref does not reset the state of filters and other modes, so the output moves smoothly, like an analog circuit whose reference has shifted.
 
@@ -96,7 +93,7 @@ Inside the module, voltages are codes with 1/8 LSB resolution (`raw_fx3`, 1 code
 ### Sampling rate and decimation
 * The module samples at **200 kHz**. Times and frequencies refer to this rate.
 * **Filters:** `fc` can be set from 2 Hz to 48 kHz (`MIMIC_FILTER_FC_MIN_HZ` - `MIMIC_FILTER_FC_MAX_HZ`), and `Q` from 0.1 to 10; values outside are clamped. Decimation is not needed for low cutoffs.
-* **Decimation (advanced):** `setDecimation(N)` slows the whole module down by 2^N (N = 0 to 16): the processing rate becomes `200 kHz / 2^N`, input samples are averaged and the output is interpolated. **Every time becomes 2^N times longer and every frequency 2^N times lower**, for the current mode and the next ones; the settings are not recalculated. For example, `setFilterBiquadLPF(1000.0f)` with `setDecimation(4)` gives fc = 62.5 Hz. Use it for long delays, slow S&H, very long time constants or averaging. The output continues from its current value when N is changed.
+* **Decimation (advanced):** `setDecimation(N)` slows the whole module down by 2^N (N = 0 to 16): the processing rate becomes `200 kHz / 2^N`, input samples are averaged and the output is interpolated. **Every time becomes 2^N times longer and every frequency 2^N times lower**, for the current mode and the next ones; the settings are not recalculated. For example, `setFilterBiquadLPF(1000.0f)` with `setDecimation(4)` gives fc = 62.5 Hz. Use it for very long time constants or averaging. The output continues from its current value when N is changed.
 
 ### Calibration
 Each module is calibrated at production, and the gain and offset are stored in its flash memory. You normally do not need `setGainCal()`, `setOffsetCal()` or `commitCalibrationToNvm()`. Writing new values to NVM overwrites the factory calibration.
@@ -131,7 +128,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
-| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants, squarer, square rooter, true RMS and oscillator / VCO modes; log input relative to Vref; new mode payloads |
+| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants; new mode payloads |
 | 0.1.0 | 20261025 - 20261030 | First release |
 
 Check the firmware of your module with `getBuildDate()`:
@@ -145,10 +142,9 @@ Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic).
 
 ### Updating sketches from 0.1.0
 * **Voltages are in V, not mV:** the constructor (`Mimic0x mimic(5.0f)`, or `MIMIC_VDD_5V`, which is now 5.0f) and every voltage argument. A sketch that still passes mV compiles, so check every call: `setVref(2500)` must become `setVref(2.5f)`.
-* `setSlewRateLimiter()` takes V/µs instead of a ratio per sample.
 * `setDecimation()` no longer changes the meaning of the settings: times and frequencies of the module are scaled by 2^N.
 * `setMathDerivative()` and `setMathIntegral()` are replaced by `setDifferentiator(differentiationTimeUs, limitTimeUs)` and `setIntegrator(integrationTimeUs, leakTimeUs)`, which take the time constants of the analog circuit in µs.
-* `setLog()`: the input is measured from Vref, not from 0 V. For a sensor whose zero is 0 V, call `setVref(0.0f)` first.
+* The log / antilog, sample & hold, track & hold, slew rate limiter and delay modes of 0.1.0 are not in this release. They will return, with the units above, in a later release.
 * `getAdcValue()` returns a code with 1/8 LSB resolution (ADC code × 8); `getInputVolts()` returns volts.
 * The second constructor argument is the I²C address offset (0 - 3).
 

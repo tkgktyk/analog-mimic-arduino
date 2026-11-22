@@ -24,16 +24,10 @@ const float BPF_FC       = waveFreq * 3;  // 300Hz cutoff for 3rd harmonic extra
 const float BPF_Q        = 5.0;           // Sharpness of band-pass extraction
 
 // --- Special DSP Function Parameters ---
-const float SH_FREQ_HZ = waveFreq * 10;   // S&H sampling frequency (10x coarser than waveform)
-const float TH_DUTY_CYCLE = 0.5;          // Track time ratio (0.0 to 1.0)
 const float VREF_V = MIMIC_VDD_5V / 2;    // Center voltage reference (default)
-const float SLEW_LIMIT_VAL = waveFreq/100000.0f;      // Maximum rate of change per sample
 const float ENVELOPE_TIME_US = waveFreq*10.0f;  // Decay time constant for envelope follower
 const float SCHMITT_HIGH_V = 3.0f;        // Upper threshold for Schmitt trigger
 const float SCHMITT_LOW_V = 2.0f;         // Lower threshold for Schmitt trigger
-const float RMS_TAU_US = 20000.0f;        // RMS averaging time constant (20 ms)
-const float OSC_FREQ_HZ = 440.0f;         // Oscillator frequency (input not used)
-const float OSC_AMP_V = 1.0f;             // Oscillator peak amplitude
 
 // --- State Management ---
 enum DemoMode {
@@ -43,7 +37,6 @@ enum DemoMode {
   MODE_PULSE_LPF2_BESSEL,
   MODE_PULSE_LPF2_BUTTERWORTH,
   MODE_PULSE_LPF2_CHEBYSHEV,
-  MODE_PULSE_SLEW_LIMIT,
   MODE_PULSE_HPF,
   MODE_PULSE_HPF2_BESSEL,
   MODE_PULSE_HPF2_BUTTERWORTH,
@@ -51,15 +44,9 @@ enum DemoMode {
   MODE_PULSE_BPF,
   MODE_SINE_BYPASS,
   MODE_SINE_BIQUAD_UNITY,
-  MODE_SINE_SH,
-  MODE_SINE_TH,
   MODE_SINE_ENVELOPE,
   MODE_SINE_RECTIFIER,
-  MODE_SINE_LOG_AMP,
   MODE_SINE_SCHMITT,
-  MODE_SINE_SQUARE,
-  MODE_SINE_RMS,
-  MODE_OSCILLATOR,
   MAX_MODES
 };
 
@@ -123,7 +110,7 @@ void setup() {
   timer.open();
   timer.start(); 
 
-  Serial.println("Type 0-9 or a-m to select a mode.");
+  Serial.println("Type 0-9 or a-f to select a mode.");
   setDemoMode(currentMode);
 }
 
@@ -149,7 +136,7 @@ void loop() {
 
 void setDemoMode(DemoMode mode) {
   Serial.print("\n[Mode "); Serial.print(mode); Serial.print("] ");
-  mimic.setVref(VREF_V);   // the LOG demo changes Vref; restore the default for the others
+  mimic.setVref(VREF_V);
 
   switch (mode) {
     case MODE_PULSE_BYPASS:
@@ -180,11 +167,6 @@ void setDemoMode(DemoMode mode) {
     case MODE_PULSE_LPF2_CHEBYSHEV:
       Serial.println("PULSE -> Biquad LPF (1kHz, Chebyshev): Sharp cutoff with passband ripple");
       mimic.setFilterBiquadLPF(LPF_LIGHT_FC, MIMIC_FILTER_Q_CHEBYSHEV);
-      break;
-
-    case MODE_PULSE_SLEW_LIMIT:
-      Serial.println("PULSE -> Slew Rate Limiter: Converts square wave into triangle wave");
-      mimic.setSlewRateLimiter(SLEW_LIMIT_VAL); 
       break;
 
     case MODE_PULSE_HPF:
@@ -222,22 +204,6 @@ void setDemoMode(DemoMode mode) {
       mimic.setFilterBiquadUnity();
       break;
 
-    case MODE_SINE_SH:
-      Serial.print("SINE  -> Sample & Hold (");
-      Serial.print(SH_FREQ_HZ);
-      Serial.println(" Hz): Generates a step-like staircase waveform");
-      mimic.setSampleAndHold(SH_FREQ_HZ); 
-      break;
-
-    case MODE_SINE_TH:
-      Serial.print("SINE  -> Track & Hold (");
-      Serial.print(SH_FREQ_HZ);
-      Serial.print(" Hz, Track Duty: ");
-      Serial.print(TH_DUTY_CYCLE * 100);
-      Serial.println("%): Alternates between tracking and holding the input");
-      mimic.setTrackAndHold(SH_FREQ_HZ, TH_DUTY_CYCLE); 
-      break;
-
     case MODE_SINE_ENVELOPE:
       Serial.println("SINE  -> Envelope Follower: Extracts amplitude boundaries");
       mimic.setEnvelopeFollower(ENVELOPE_TIME_US, 0); 
@@ -248,30 +214,9 @@ void setDemoMode(DemoMode mode) {
       mimic.setRectifierFull();
       break;
 
-    case MODE_SINE_LOG_AMP:
-      Serial.println("SINE  -> Log Amplifier (Vref = 0 V): Logarithmic compression of the peaks");
-      mimic.setVref(0.0f);     // the input is a magnitude above Vref: measure it from 0 V
-      mimic.setLog(2.0f, 1.0f);
-      break;
-
     case MODE_SINE_SCHMITT:
       Serial.println("SINE  -> Schmitt Trigger: Hysteresis comparator window operation");
       mimic.setComparatorSchmitt(SCHMITT_HIGH_V, SCHMITT_LOW_V);
-      break;
-
-    case MODE_SINE_SQUARE:
-      Serial.println("SINE  -> Squarer: Doubles the frequency (sin^2), output from 0 V");
-      mimic.setSquarer();
-      break;
-
-    case MODE_SINE_RMS:
-      Serial.println("SINE  -> True RMS converter (20 ms): DC output = amplitude / sqrt(2)");
-      mimic.setTrueRms(RMS_TAU_US);
-      break;
-
-    case MODE_OSCILLATOR:
-      Serial.println("OSC   -> Sine oscillator (440 Hz, 1 V): The module generates its own signal");
-      mimic.setOscillator(OSC_FREQ_HZ, OSC_AMP_V);
       break;
 
     default:

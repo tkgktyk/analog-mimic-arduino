@@ -232,29 +232,7 @@ public:
    */
   void setPGA(float gain);
 
-  // --- 3. Logarithmic / antilogarithmic amplifier ---
-
-  /**
-   * @brief Logarithmic amplifier: out = Vref + slope * log10((in - Vref) / unit).
-   * @param slopeVPerDecade Output change per decade of the input in V (negative = inverting).
-   * @param unitV Input above Vref at which the output equals Vref.
-   * @note  The input is a magnitude above Vref; inputs near or below Vref saturate low.
-   *        For a sensor whose zero is 0 V (a photodiode), call setVref(0.0f). After an
-   *        envelope follower module, use the same Vref in both modules.
-   */
-  void setLog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
-
-  /**
-   * @brief Antilogarithmic (exponential) amplifier: out = unit * 10^((in - Vref) / slope).
-   * @param slopeVPerDecade Input change per decade of the output in V (same as setLog()).
-   * @param unitV Output voltage (from 0 V) when the input equals Vref.
-   * @note  The output is a magnitude from 0 V (lift it with setOutputOffset() if needed).
-   *        With the same slope and unit, setAntilog() is the inverse of setLog() when
-   *        the Vref of setLog() equals the output offset of setAntilog().
-   */
-  void setAntilog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
-
-  // --- 4. Comparators (digital output) ---
+  // --- 3. Comparators (digital output) ---
 
   /**
    * @brief Window comparator: HIGH when the input is above upper or below lower.
@@ -268,7 +246,7 @@ public:
    */
   void setComparatorSchmitt(float upperV, float lowerV);
 
-  // --- 5. Envelope, peak hold, sample & hold ---
+  // --- 4. Envelope follower and peak hold ---
 
   /**
    * @brief Envelope follower (AM detector): follows the peak above Vref (positive) or
@@ -281,17 +259,7 @@ public:
   /** @brief Peak hold (envelope follower without decay). @param polarity MIMIC_POLARITY_*. */
   void setPeakHold(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
-  /** @brief Sample and hold. @param freqHz Sampling frequency in Hz. */
-  void setSampleAndHold(float freqHz);
-
-  /**
-   * @brief Track and hold.
-   * @param freqHz Frequency of the track / hold cycle in Hz.
-   * @param trackRatio Part of the period spent tracking (0.0 - 1.0).
-   */
-  void setTrackAndHold(float freqHz, float trackRatio = 0.5f);
-
-  // --- 6. Clippers ---
+  // --- 5. Clippers ---
 
   /**
    * @brief Hard clipper: passes the input between the limits and clips outside.
@@ -307,7 +275,7 @@ public:
    */
   void setSoftClipper(float upperV, float lowerV);
 
-  // --- 7. Integrator / differentiator, multiplier, true RMS, rectifiers, slew rate, delay ---
+  // --- 6. Integrator / differentiator, rectifiers ---
 
   /**
    * @brief Integrator, like an op-amp integrator (input R, feedback C):
@@ -332,6 +300,115 @@ public:
    *        about 16 kHz. 0: no limit (the difference of two samples).
    */
   void setDifferentiator(float differentiationTimeUs, float limitTimeUs = 10.0f);
+
+  /**
+   * @brief Half-wave rectifier folding at Vref.
+   * @param polarity MIMIC_POLARITY_POSITIVE: max(in, Vref), MIMIC_POLARITY_NEGATIVE: min(in, Vref).
+   */
+  void setRectifierHalf(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
+
+  /**
+   * @brief Full-wave rectifier (absolute value around Vref).
+   * @param polarity MIMIC_POLARITY_POSITIVE: Vref + |in - Vref|, MIMIC_POLARITY_NEGATIVE: Vref - |in - Vref|.
+   */
+  void setRectifierFull(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
+
+  // --- Calibration (output gain and offset, stored in the module's flash) ---
+
+  /**
+   * @brief Sets the output gain calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param gain Gain multiplier (e.g., 1.0023), 0 to < 2.0.
+   */
+  void setGainCal(float gain);
+
+  /**
+   * @brief Sets the output offset calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param offsetLsb Offset in output LSB (VDD / 4096, e.g. -6.44); resolution 1/8 LSB.
+   */
+  void setOffsetCal(float offsetLsb);
+
+  /** @brief Stores the calibration in RAM to the module's flash. */
+  void commitCalibrationToNvm();
+
+  /** @brief Reloads the calibration from the module's flash. */
+  void reloadCalibrationFromNvm();
+
+protected:
+  MimicBase(float vddV, uint8_t addressOffset = 0);
+
+  // ===================================================================================
+  // Experimental modes
+  //   Implemented in the firmware, but not yet verified on hardware and in application
+  //   examples. They are public in MimicExperimental<> (AnalogMimicExperimental.h);
+  //   the API may change before they are released here.
+  // ===================================================================================
+
+  // --- Time: sample & hold, slew rate, delay ---
+
+  /** @brief Sample and hold. @param freqHz Sampling frequency in Hz. */
+  void setSampleAndHold(float freqHz);
+
+  /**
+   * @brief Track and hold.
+   * @param freqHz Frequency of the track / hold cycle in Hz.
+   * @param trackRatio Part of the period spent tracking (0.0 - 1.0).
+   */
+  void setTrackAndHold(float freqHz, float trackRatio = 0.5f);
+
+  /**
+   * @brief Slew rate limiter, like the slew rate of an op-amp.
+   * @param slewVPerUs Maximum rate of change of the output in V/us. The smallest step is
+   *        VDD / 32768 per sample (about 0.03 V/ms at 5 V); 0 freezes the output.
+   */
+  void setSlewRateLimiter(float slewVPerUs);
+
+  /**
+   * @brief Delay line (dead time).
+   * @param delaySamples Delay in samples (0 - MIMIC_DELAY_SAMPLES_MAX); 1 sample = 5 us.
+   */
+  void setDigitalDelay(uint16_t delaySamples);
+
+  // --- Signal sources (input not used, except the VCO) ---
+
+  /**
+   * @brief Sine oscillator: out = Vref + amplitude * sin(2 pi f t).
+   * @param freqHz Frequency in Hz (0 - MIMIC_OSC_FREQ_MAX_HZ). 0 gives a constant Vref
+   *        (a voltage source set by setVref()).
+   * @param amplitudeV Peak amplitude in V.
+   * @note  The phase continues when the frequency or the amplitude is changed.
+   */
+  void setOscillator(float freqHz, float amplitudeV);
+
+  /**
+   * @brief Voltage-controlled oscillator (sine): f = f0 + k * (in - Vref), limited to
+   *        0 - MIMIC_OSC_FREQ_MAX_HZ (linear FM; put an antilog module in front for 1 V/oct).
+   * @param centerFreqHz Frequency f0 in Hz when the input equals Vref.
+   * @param hzPerVolt Sensitivity k in Hz/V (negative: the frequency falls as the input rises).
+   * @param amplitudeV Peak amplitude in V.
+   */
+  void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV);
+
+  // --- Nonlinear: logarithm, multiplier, true RMS ---
+
+  /**
+   * @brief Logarithmic amplifier: out = Vref + slope * log10((in - Vref) / unit).
+   * @param slopeVPerDecade Output change per decade of the input in V (negative = inverting).
+   * @param unitV Input above Vref at which the output equals Vref.
+   * @note  The input is a magnitude above Vref; inputs near or below Vref saturate low.
+   *        For a sensor whose zero is 0 V (a photodiode), call setVref(0.0f). After an
+   *        envelope follower module, use the same Vref in both modules.
+   */
+  void setLog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
+
+  /**
+   * @brief Antilogarithmic (exponential) amplifier: out = unit * 10^((in - Vref) / slope).
+   * @param slopeVPerDecade Input change per decade of the output in V (same as setLog()).
+   * @param unitV Output voltage (from 0 V) when the input equals Vref.
+   * @note  The output is a magnitude from 0 V (lift it with setOutputOffset() if needed).
+   *        With the same slope and unit, setAntilog() is the inverse of setLog() when
+   *        the Vref of setLog() equals the output offset of setAntilog().
+   */
+  void setAntilog(float slopeVPerDecade = 1.0f, float unitV = 0.5f);
 
   /**
    * @brief Squarer (an analog multiplier with both inputs tied):
@@ -363,74 +440,6 @@ public:
    *        the processing does not fit in one sample period.
    */
   void setTrueRms(float averagingTimeUs);
-
-  /**
-   * @brief Half-wave rectifier folding at Vref.
-   * @param polarity MIMIC_POLARITY_POSITIVE: max(in, Vref), MIMIC_POLARITY_NEGATIVE: min(in, Vref).
-   */
-  void setRectifierHalf(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
-
-  /**
-   * @brief Full-wave rectifier (absolute value around Vref).
-   * @param polarity MIMIC_POLARITY_POSITIVE: Vref + |in - Vref|, MIMIC_POLARITY_NEGATIVE: Vref - |in - Vref|.
-   */
-  void setRectifierFull(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
-
-  /**
-   * @brief Slew rate limiter, like the slew rate of an op-amp.
-   * @param slewVPerUs Maximum rate of change of the output in V/us. The smallest step is
-   *        VDD / 32768 per sample (about 0.03 V/ms at 5 V); 0 freezes the output.
-   */
-  void setSlewRateLimiter(float slewVPerUs);
-
-  /**
-   * @brief Delay line (dead time).
-   * @param delaySamples Delay in samples (0 - MIMIC_DELAY_SAMPLES_MAX); 1 sample = 5 us.
-   */
-  void setDigitalDelay(uint16_t delaySamples);
-
-  // --- 8. Oscillator (input not used, except the VCO) ---
-
-  /**
-   * @brief Sine oscillator: out = Vref + amplitude * sin(2 pi f t).
-   * @param freqHz Frequency in Hz (0 - MIMIC_OSC_FREQ_MAX_HZ). 0 gives a constant Vref
-   *        (a voltage source set by setVref()).
-   * @param amplitudeV Peak amplitude in V.
-   * @note  The phase continues when the frequency or the amplitude is changed.
-   */
-  void setOscillator(float freqHz, float amplitudeV);
-
-  /**
-   * @brief Voltage-controlled oscillator (sine): f = f0 + k * (in - Vref), limited to
-   *        0 - MIMIC_OSC_FREQ_MAX_HZ (linear FM; put an antilog module in front for 1 V/oct).
-   * @param centerFreqHz Frequency f0 in Hz when the input equals Vref.
-   * @param hzPerVolt Sensitivity k in Hz/V (negative: the frequency falls as the input rises).
-   * @param amplitudeV Peak amplitude in V.
-   */
-  void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV);
-
-  // --- Calibration (output gain and offset, stored in the module's flash) ---
-
-  /**
-   * @brief Sets the output gain calibration (RAM; use commitCalibrationToNvm() to store).
-   * @param gain Gain multiplier (e.g., 1.0023), 0 to < 2.0.
-   */
-  void setGainCal(float gain);
-
-  /**
-   * @brief Sets the output offset calibration (RAM; use commitCalibrationToNvm() to store).
-   * @param offsetLsb Offset in output LSB (VDD / 4096, e.g. -6.44); resolution 1/8 LSB.
-   */
-  void setOffsetCal(float offsetLsb);
-
-  /** @brief Stores the calibration in RAM to the module's flash. */
-  void commitCalibrationToNvm();
-
-  /** @brief Reloads the calibration from the module's flash. */
-  void reloadCalibrationFromNvm();
-
-protected:
-  MimicBase(float vddV, uint8_t addressOffset = 0);
 
   uint8_t _i2c_addr;
   TwoWire *_wire;
