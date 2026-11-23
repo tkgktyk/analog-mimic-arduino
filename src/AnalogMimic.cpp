@@ -428,6 +428,7 @@ void MimicBase::sendClipper(uint8_t type, float upperV, float lowerV) {
 
 void MimicBase::setClipper(float upperV, float lowerV)     { sendClipper(MIMIC_CLIPPER_HARD, upperV, lowerV); }
 void MimicBase::setSoftClipper(float upperV, float lowerV) { sendClipper(MIMIC_CLIPPER_SOFT, upperV, lowerV); }
+void MimicBase::setConstantVoltage(float volts)            { sendClipper(MIMIC_CLIPPER_HARD, volts, volts); }
 void MimicBase::setDeadZone(float upperV, float lowerV)    { sendClipper(MIMIC_CLIPPER_DEAD_ZONE, upperV, lowerV); }
 
 // --- Integrator / differentiator ---

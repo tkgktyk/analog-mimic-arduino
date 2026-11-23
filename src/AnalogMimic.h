@@ -275,6 +275,15 @@ public:
    */
   void setSoftClipper(float upperV, float lowerV);
 
+  /**
+   * @brief Constant voltage source: the output stays at volts whatever the input (a clipper
+   *        whose upper and lower limits are both volts). Vref is not changed, and the
+   *        output calibration applies as for any signal.
+   * @param volts Output voltage in V. The analog stage does not reach within about 0.1 V
+   *        of 0 V and of VDD.
+   */
+  void setConstantVoltage(float volts);
+
   // --- 6. Integrator / differentiator, rectifiers ---
 
   /**
