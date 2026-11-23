@@ -74,10 +74,10 @@ void notch() {
   mimic.setFilterBiquadNotch(SIGNAL_HZ * 3, 1.0f);
 }
 
-// @demo Square -> biquad APF (3 x signal): shape changes, amplitude stays
+// @demo Sine -> biquad APF (fc = signal): 180 degrees behind, the same amplitude
 void allPass() {
-  testSignal.begin(MimicTestSignal::SQUARE, SIGNAL_HZ);
-  mimic.setFilterBiquadAPF(SIGNAL_HZ * 3);
+  testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
+  mimic.setFilterBiquadAPF(SIGNAL_HZ);
 }
 
 // @demo Sine -> unity-gain biquad: flat, the same as bypass

@@ -44,8 +44,10 @@ void highPass() {
   mimic.setFilter1stHPF(SIGNAL_HZ * 10);
 }
 
-// @demo Square -> 1st-order APF (fc = 3 x signal): shape changes, amplitude stays
+// @demo Sine -> 1st-order APF (fc = signal): 90 degrees behind, the same amplitude
 void allPass() {
-  testSignal.begin(MimicTestSignal::SQUARE, SIGNAL_HZ);
-  mimic.setFilter1stAPF(SIGNAL_HZ * 3);
+  // A square wave would jump by twice its step at each edge (the gain is 1 at high
+  // frequencies and -1 at DC) and go past the supply
+  testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
+  mimic.setFilter1stAPF(SIGNAL_HZ);
 }

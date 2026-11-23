@@ -61,10 +61,12 @@ void Filter1st_highPass() {
   mimic.setFilter1stHPF(SIGNAL_HZ * 10);
 }
 
-// @demo Square -> 1st-order APF (fc = 3 x signal): shape changes, amplitude stays
+// @demo Sine -> 1st-order APF (fc = signal): 90 degrees behind, the same amplitude
 void Filter1st_allPass() {
-  testSignal.begin(MimicTestSignal::SQUARE, SIGNAL_HZ);
-  mimic.setFilter1stAPF(SIGNAL_HZ * 3);
+  // A square wave would jump by twice its step at each edge (the gain is 1 at high
+  // frequencies and -1 at DC) and go past the supply
+  testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
+  mimic.setFilter1stAPF(SIGNAL_HZ);
 }
 
 // --- FilterBiquad ---
@@ -117,10 +119,10 @@ void FilterBiquad_notch() {
   mimic.setFilterBiquadNotch(SIGNAL_HZ * 3, 1.0f);
 }
 
-// @demo Square -> biquad APF (3 x signal): shape changes, amplitude stays
+// @demo Sine -> biquad APF (fc = signal): 180 degrees behind, the same amplitude
 void FilterBiquad_allPass() {
-  testSignal.begin(MimicTestSignal::SQUARE, SIGNAL_HZ);
-  mimic.setFilterBiquadAPF(SIGNAL_HZ * 3);
+  testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
+  mimic.setFilterBiquadAPF(SIGNAL_HZ);
 }
 
 // @demo Sine -> unity-gain biquad: flat, the same as bypass
@@ -207,8 +209,10 @@ void Integrator_integrator() {
 // @demo Triangle -> differentiator: a square wave
 void Differentiator_differentiator() {
   testSignal.begin(MimicTestSignal::TRIANGLE, SIGNAL_HZ);
-  // The triangle slope (2.5 V per half period) gives about +-1 V
-  mimic.setDifferentiator(2e5f / SIGNAL_HZ);
+  // The triangle slope (2.5 V per half period) gives about +-1 V. The limit time sets the
+  // gain at high frequencies (differentiation time / limit time = 10 here): a shorter limit
+  // gives sharper edges but amplifies the input noise as much
+  mimic.setDifferentiator(2e5f / SIGNAL_HZ, 2e4f / SIGNAL_HZ);
 }
 
 struct Demo {
@@ -225,7 +229,7 @@ const Demo DEMOS[] = {
   {"Filter1st", "Square -> 1st-order LPF (fc = 10 x signal): rounds the edges", Filter1st_lowPass},
   {"Filter1st", "Square -> 1st-order LPF (fc = signal): heavily smooths the wave", Filter1st_lowPassHeavy},
   {"Filter1st", "Square -> 1st-order HPF (fc = 10 x signal): spikes at the edges", Filter1st_highPass},
-  {"Filter1st", "Square -> 1st-order APF (fc = 3 x signal): shape changes, amplitude stays", Filter1st_allPass},
+  {"Filter1st", "Sine -> 1st-order APF (fc = signal): 90 degrees behind, the same amplitude", Filter1st_allPass},
   {"FilterBiquad", "Square -> biquad LPF (fc = 10 x signal, Bessel): smooth, almost no ringing", FilterBiquad_lowPassBessel},
   {"FilterBiquad", "Square -> biquad LPF (Butterworth): maximally flat passband", FilterBiquad_lowPassButterworth},
   {"FilterBiquad", "Square -> biquad LPF (Chebyshev): sharp cutoff, ringing", FilterBiquad_lowPassChebyshev},
@@ -234,7 +238,7 @@ const Demo DEMOS[] = {
   {"FilterBiquad", "Square -> biquad HPF (Chebyshev)", FilterBiquad_highPassChebyshev},
   {"FilterBiquad", "Square -> biquad BPF (3 x signal, Q = 5): picks the 3rd harmonic (a sine)", FilterBiquad_bandPass},
   {"FilterBiquad", "Square -> biquad notch (3 x signal, Q = 1): removes the 3rd harmonic", FilterBiquad_notch},
-  {"FilterBiquad", "Square -> biquad APF (3 x signal): shape changes, amplitude stays", FilterBiquad_allPass},
+  {"FilterBiquad", "Sine -> biquad APF (fc = signal): 180 degrees behind, the same amplitude", FilterBiquad_allPass},
   {"FilterBiquad", "Sine -> unity-gain biquad: flat, the same as bypass", FilterBiquad_unity},
   {"Comparator", "Sine -> Schmitt trigger (3.0 V / 2.0 V): clean edges with hysteresis", Comparator_schmitt},
   {"Comparator", "Sine -> window comparator (3.0 V / 2.0 V): high outside the window", Comparator_window},

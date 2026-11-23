@@ -28,6 +28,8 @@ void loop() {}
 // @demo Triangle -> differentiator: a square wave
 void differentiator() {
   testSignal.begin(MimicTestSignal::TRIANGLE, SIGNAL_HZ);
-  // The triangle slope (2.5 V per half period) gives about +-1 V
-  mimic.setDifferentiator(2e5f / SIGNAL_HZ);
+  // The triangle slope (2.5 V per half period) gives about +-1 V. The limit time sets the
+  // gain at high frequencies (differentiation time / limit time = 10 here): a shorter limit
+  // gives sharper edges but amplifies the input noise as much
+  mimic.setDifferentiator(2e5f / SIGNAL_HZ, 2e4f / SIGNAL_HZ);
 }
