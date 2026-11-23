@@ -111,6 +111,7 @@ bool MimicBase::begin(TwoWire *wire) {
     writeOneByte(MIMIC_REG_GLOBAL_DECIMATION_N, _decimation_N);
     writeTwoBytes(MIMIC_REG_GLOBAL_OFFSET, 0);
     writeTwoBytes(MIMIC_REG_GLOBAL_VREF, (uint16_t)MIMIC_VREF_DEFAULT_RAW_FX3);  // VDD / 2
+    writeOneByte(MIMIC_REG_GLOBAL_TEST_PAD, MIMIC_TEST_PAD_OFF);
     return true;
 }
 
@@ -635,6 +636,10 @@ void MimicBase::setVfConverter(float hzPerVolt, float zeroFreqHz) {
     put16(payload, 4, mant);
     payload[6] = (uint8_t)exp;
     writeModeAndPayload(MIMIC_MODE_ID_VF_CONVERTER, payload, 7);
+}
+
+void MimicBase::setTestPadOutput(uint8_t source) {
+    writeOneByte(MIMIC_REG_GLOBAL_TEST_PAD, source);
 }
 
 // Noise: [0] color, [1-2] amplitude

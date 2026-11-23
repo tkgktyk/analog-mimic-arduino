@@ -48,6 +48,9 @@ public:
   using Base::setVfConverter;
   using Base::setNoise;
 
+  // Test pad
+  using Base::setTestPadOutput;
+
   // Nonlinear: logarithm, multiplier, true RMS, dead zone
   using Base::setLog;
   using Base::setAntilog;

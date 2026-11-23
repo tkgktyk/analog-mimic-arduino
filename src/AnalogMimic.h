@@ -456,6 +456,18 @@ protected:
    */
   void setNoise(float amplitudeV, uint8_t color = MIMIC_NOISE_WHITE);
 
+  // --- Test pad ---
+
+  /**
+   * @brief Selects the signal on the test pad (PA2 on mimic01).
+   * @param source MIMIC_TEST_PAD_OFF (not driven, after begin()) or
+   *        MIMIC_TEST_PAD_SAMPLE_CLOCK: a 100 kHz square wave that toggles at every sample,
+   *        a reference for the output timing (with an oscillator square at
+   *        MIMIC_OSC_FREQ_MAX_HZ on the analog output, or a V/F converter at that frequency
+   *        on the digital output, the output also changes at every sample).
+   */
+  void setTestPadOutput(uint8_t source);
+
   // --- Nonlinear: logarithm, multiplier, true RMS, dead zone ---
 
   /**
