@@ -155,7 +155,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
-| 0.2.0 | 20261107 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants; new mode payloads |
+| 0.2.0 | 20261123 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants; constant voltage; new mode payloads; examples per mode with a test signal (UNO R4) |
 | 0.1.0 | 20261025 - 20261030 | First release |
 
 Check the firmware of your module with `getBuildDate()`:
@@ -165,7 +165,7 @@ Serial.println(mimic.getBuildDate(), HEX);   // e.g. 20261031
 ```
 
 Firmware built outside the range does not work correctly with that release.
-Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic).
+Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic) (the `.hex` files are attached to its releases, e.g. `fw-20261123`).
 
 ### Updating sketches from 0.1.0
 * **Voltages are in V, not mV:** the constructor (`Mimic0x mimic(5.0f)`, or `MIMIC_VDD_5V`, which is now 5.0f) and every voltage argument. A sketch that still passes mV compiles, so check every call: `setVref(2500)` must become `setVref(2.5f)`.
