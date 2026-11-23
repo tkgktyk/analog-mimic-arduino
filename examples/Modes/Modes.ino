@@ -7,7 +7,7 @@ Mimic0x mimic(MIMIC_VDD_5V);
 volatile uint16_t *const DAC_REG = (uint16_t *)0x4005E000;
 
 // --- Waveform Configuration Parameters ---
-volatile float waveFreq = 1000.0; // Base waveform frequency (100Hz scale)
+volatile float waveFreq = 100.0;  // Base waveform frequency: every time and frequency below scales with it
 #define SINE_TABLE_SIZE 256
 
 // Waveform amplitude constants (12-bit DAC: 0 - 4095)
@@ -25,7 +25,7 @@ const float BPF_Q        = 5.0;           // Sharpness of band-pass extraction
 
 // --- Special DSP Function Parameters ---
 const float VREF_V = MIMIC_VDD_5V / 2;    // Center voltage reference (default)
-const float ENVELOPE_TIME_US = waveFreq*10.0f;  // Decay time constant for envelope follower
+const float ENVELOPE_TIME_US = 1e7f / waveFreq;  // Decay time constant: 10 waveform periods
 const float SCHMITT_HIGH_V = 3.0f;        // Upper threshold for Schmitt trigger
 const float SCHMITT_LOW_V = 2.0f;         // Lower threshold for Schmitt trigger
 
@@ -106,7 +106,7 @@ void setup() {
   int8_t timer_ch = FspTimer::get_available_timer(timer_type);
   
   timer.begin(TIMER_MODE_PERIODIC, timer_type, timer_ch, MIMIC_ADC_SAMPLING_HZ, 50, timer_callback);
-  timer.setup_overflow_irq();
+  timer.setup_overflow_irq(0);  // highest priority: USB and millis interrupts must not delay the DAC update
   timer.open();
   timer.start(); 
 
