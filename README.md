@@ -121,6 +121,33 @@ for (uint8_t ch = 0; ch < 8; ch++) {
 }
 ```
 
+---
+
+## Examples
+
+| Example | What it shows |
+|---|---|
+| `BasicRead`, `ContinuousRead` | Reading the module input with `getAdcValue()` / `getInputVolts()` |
+| `Amplifier` | Bypass and the programmable gain amplifier |
+| `Filter1st` | First-order LPF / HPF / APF |
+| `FilterBiquad` | Second-order LPF / HPF (Bessel, Butterworth, Chebyshev), BPF, notch, APF |
+| `Comparator` | Schmitt trigger and window comparator (digital output) |
+| `Clipper` | Hard and soft clippers |
+| `ConstantVoltage` | A fixed output voltage |
+| `Rectifier` | Full-wave and half-wave rectifiers |
+| `Envelope` | Envelope follower and peak hold |
+| `Integrator`, `Differentiator` | Op-amp integrator and differentiator |
+| `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor |
+| `Decimation` | Running the processing at a lower rate |
+| `CpuCycles` | Processing time of each mode on the module |
+| `I2CScanner` | Finding the module address |
+
+The examples from `Amplifier` to `Modes` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope. Each example runs one demo from `setup()`; the other demos are listed there. The test signal frequency `SIGNAL_HZ` (100 Hz) sets every time and frequency of the demos.
+
+> **Note:** The edges of the test signal move by a few microseconds from one period to the next (timer interrupt latency of the Arduino). The module itself updates its output at a fixed time after each sample. Trigger the oscilloscope on the edge you are looking at.
+
+---
+
 ## Releases and Firmware Compatibility
 
 The library and the module firmware share the register map (`src/mimic_registers.h`).
@@ -183,3 +210,11 @@ pio run                       # Build all examples
 ```
    This is only required for command-line builds and `pio run`. The **Ctrl+Shift+B** tasks work without it.
    
+
+### Mode Examples and the Modes Sketch
+`examples/Modes/Modes.ino` is **generated** from the demos of the mode examples (`Amplifier` ... `Differentiator`, listed in `extras/gen_modes.py`). A demo is a function marked with `// @demo <description>` that uses only `mimic`, `testSignal`, `SIGNAL_HZ` and the library constants. After changing a mode example, regenerate and commit `Modes.ino` too:
+```sh
+python extras/gen_modes.py          # regenerate examples/Modes/Modes.ino
+python extras/gen_modes.py --check  # fails if Modes.ino is out of date (also run by CI)
+```
+Do not edit `Modes.ino` by hand. To test every mode, upload `Modes` and type the keys in the serial monitor.
