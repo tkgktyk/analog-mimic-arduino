@@ -39,9 +39,14 @@ public:
   using Base::setSlewRateLimiter;
   using Base::setDigitalDelay;
 
-  // Signal sources
+  // Signal sources and modulators
   using Base::setOscillator;
   using Base::setVco;
+  using Base::setAmModulator;
+  using Base::setRingModulator;
+  using Base::setPwmModulator;
+  using Base::setVfConverter;
+  using Base::setNoise;
 
   // Nonlinear: logarithm, multiplier, true RMS, dead zone
   using Base::setLog;

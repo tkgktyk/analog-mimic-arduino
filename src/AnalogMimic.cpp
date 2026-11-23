@@ -559,38 +559,91 @@ void MimicBase::setDigitalDelay(uint16_t delaySamples) {
 
 // Payload: [0] type, [1-4] phase increment (f = inc * fs / 2^32), [5-6] amplitude raw_fx3,
 // [7-8] VCO gain mant int16, [9] VCO gain exp int8: phase increment per raw_fx3 of input
-void MimicBase::sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt, uint8_t waveform) {
-    const float incPerHz = 4294967296.0f / MIMIC_SAMPLING_HZ;
-    float inc = roundf(clampf(freqHz, 0.0f, MIMIC_OSC_FREQ_MAX_HZ) * incPerHz);
+// Phase increment per Hz of the oscillator (f = inc * fs / 2^32)
+static const float OSC_INC_PER_HZ = 4294967296.0f / MIMIC_SAMPLING_HZ;
+
+// k of the VCO / VF: phase increment per raw_fx3 of the input
+float MimicBase::oscFmGain(float hzPerVolt) const {
+    return hzPerVolt * OSC_INC_PER_HZ * _vdd_v / (float)((MIMIC_ADC_MAX_VALUE + 1) << MIMIC_RAW_FX3_FRAC_BITS);
+}
+
+// The DDS fields shared by the oscillator, modulator, PWM modulator and V/F converter:
+// phase increment for freqHz, and k = mant * 2^exp (|mant| in 16384 - 32767 when possible)
+static uint32_t oscIncrement(float freqHz) {
+    float inc = roundf(clampf(freqHz, 0.0f, MIMIC_OSC_FREQ_MAX_HZ) * OSC_INC_PER_HZ);
     if (inc > 2147483647.0f) inc = 2147483647.0f;
-    uint32_t incU = (uint32_t)inc;
+    return (uint32_t)inc;
+}
+static void oscMantExp(float k, int16_t *mant, int8_t *exp) {
+    int8_t e = 0;
+    while (fabs(k) > 32767.0f && e < 4) { k *= 0.5f; e++; }
+    while (k != 0.0f && fabs(k) < 16384.0f && e > -16) { k *= 2.0f; e--; }
+    *mant = (int16_t)clampf(roundf(k), -32768.0f, 32767.0f);
+    *exp  = e;
+}
+
+// Oscillator, modulator, PWM: [0] waveform, [1-4] inc, [5-6] amplitude, [7-8] k mant, [9] k exp.
+// k: VCO: phase increment per raw_fx3 (oscFmGain()); modulator: gain; PWM: not used.
+// Always all 10 bytes: the payload registers keep the bytes of the previous mode.
+void MimicBase::sendOscillator(uint8_t mode, uint8_t waveform, float freqHz, float amplitudeV, float k) {
+    uint32_t inc = oscIncrement(freqHz);
     int16_t amp = voltsToCode(amplitudeV);
     if (amp < 0) amp = 0;
+    int16_t mant; int8_t exp;
+    oscMantExp(k, &mant, &exp);
 
-    // k = mant * 2^exp (phase increment per raw_fx3), |mant| in 16384 - 32767 when possible
-    float k = hzPerVolt * incPerHz * _vdd_v / (float)((MIMIC_ADC_MAX_VALUE + 1) << MIMIC_RAW_FX3_FRAC_BITS);
-    int8_t exp = 0;
-    while (fabs(k) > 32767.0f && exp < 4) { k *= 0.5f; exp++; }
-    while (k != 0.0f && fabs(k) < 16384.0f && exp > -16) { k *= 2.0f; exp--; }
-    float mant = clampf(roundf(k), -32768.0f, 32767.0f);
-
-    uint8_t payload[11];
-    payload[0] = type;
-    payload[1] = waveform;
-    put16(payload, 2, (int32_t)(incU >> 16));
-    put16(payload, 4, (int32_t)(incU & 0xFFFF));
-    put16(payload, 6, amp);
-    put16(payload, 8, (int32_t)mant);
-    payload[10] = (uint8_t)exp;
-    writeModeAndPayload(MIMIC_MODE_ID_OSCILLATOR, payload, 11);
+    uint8_t payload[10];
+    payload[0] = waveform;
+    put16(payload, 1, (int32_t)(inc >> 16));
+    put16(payload, 3, (int32_t)(inc & 0xFFFF));
+    put16(payload, 5, amp);
+    put16(payload, 7, mant);
+    payload[9] = (uint8_t)exp;
+    writeModeAndPayload(mode, payload, 10);
 }
 
 void MimicBase::setOscillator(float freqHz, float amplitudeV, uint8_t waveform) {
-    sendOscillator(MIMIC_OSC_FIXED, freqHz, amplitudeV, 0.0f, waveform);
+    sendOscillator(MIMIC_MODE_ID_OSCILLATOR, waveform, freqHz, amplitudeV, 0.0f);   // k = 0: fixed
 }
 
 void MimicBase::setVco(float centerFreqHz, float hzPerVolt, float amplitudeV, uint8_t waveform) {
-    sendOscillator(MIMIC_OSC_VCO, centerFreqHz, amplitudeV, hzPerVolt, waveform);
+    sendOscillator(MIMIC_MODE_ID_OSCILLATOR, waveform, centerFreqHz, amplitudeV, oscFmGain(hzPerVolt));
+}
+
+void MimicBase::setAmModulator(float carrierHz, float carrierV, float depthPerV, uint8_t carrierWaveform) {
+    // A (1 + m (in - Vref)) = A + (A m) (in - Vref): k = A m, dimensionless
+    sendOscillator(MIMIC_MODE_ID_MODULATOR, carrierWaveform, carrierHz, carrierV, carrierV * depthPerV);
+}
+
+void MimicBase::setRingModulator(float carrierHz, float gain, uint8_t carrierWaveform) {
+    sendOscillator(MIMIC_MODE_ID_MODULATOR, carrierWaveform, carrierHz, 0.0f, gain);   // A = 0: DSB
+}
+
+void MimicBase::setPwmModulator(float carrierHz, float fullScaleV, uint8_t carrierWaveform) {
+    sendOscillator(MIMIC_MODE_ID_PWM_MODULATOR, carrierWaveform, carrierHz, fullScaleV, 0.0f);
+}
+
+// V/F converter: [0-3] inc (f0), [4-5] k mant, [6] k exp
+void MimicBase::setVfConverter(float hzPerVolt, float zeroFreqHz) {
+    uint32_t inc = oscIncrement(zeroFreqHz);
+    int16_t mant; int8_t exp;
+    oscMantExp(oscFmGain(hzPerVolt), &mant, &exp);
+    uint8_t payload[7];
+    put16(payload, 0, (int32_t)(inc >> 16));
+    put16(payload, 2, (int32_t)(inc & 0xFFFF));
+    put16(payload, 4, mant);
+    payload[6] = (uint8_t)exp;
+    writeModeAndPayload(MIMIC_MODE_ID_VF_CONVERTER, payload, 7);
+}
+
+// Noise: [0] color, [1-2] amplitude
+void MimicBase::setNoise(float amplitudeV, uint8_t color) {
+    int16_t amp = voltsToCode(amplitudeV);
+    if (amp < 0) amp = 0;
+    uint8_t payload[3];
+    payload[0] = color;
+    put16(payload, 1, amp);
+    writeModeAndPayload(MIMIC_MODE_ID_NOISE, payload, 3);
 }
 
 // -------------------------------------------------------------

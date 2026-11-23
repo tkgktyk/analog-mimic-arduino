@@ -368,7 +368,7 @@ protected:
    */
   void setDigitalDelay(uint16_t delaySamples);
 
-  // --- Signal sources (input not used, except the VCO) ---
+  // --- Signal sources and modulators ---
 
   /**
    * @brief Oscillator (function generator): out = Vref + amplitude * wave(2 pi f t).
@@ -393,6 +393,59 @@ protected:
    */
   void setVco(float centerFreqHz, float hzPerVolt, float amplitudeV,
               uint8_t waveform = MIMIC_OSC_WAVE_SINE);
+
+  /**
+   * @brief AM modulator: out = Vref + carrierV * (1 + depth * (in - Vref)) * carrier(2 pi f t).
+   *        The amplitude of the internal carrier follows the input, like a multiplier-based
+   *        AM modulator (MC1496); below -100 % (1 + depth * (in - Vref) < 0) the carrier is
+   *        inverted, as with a multiplier.
+   * @param carrierHz Carrier frequency in Hz. @param carrierV Carrier amplitude without input in V.
+   * @param depthPerV Modulation depth per volt of the input (1 / V): 1.0 gives 100 % at 1 V.
+   * @param carrierWaveform MIMIC_OSC_WAVE_* (default: sine).
+   */
+  void setAmModulator(float carrierHz, float carrierV, float depthPerV,
+                      uint8_t carrierWaveform = MIMIC_OSC_WAVE_SINE);
+
+  /**
+   * @brief Ring (balanced, DSB) modulator: out = Vref + gain * (in - Vref) * carrier(2 pi f t).
+   *        The input times the internal carrier: the sum and difference frequencies, without
+   *        the carrier. A square carrier gives a chopper (polarity switching) modulator.
+   * @param carrierHz Carrier frequency in Hz. @param gain Gain at the carrier peak (default 1).
+   * @param carrierWaveform MIMIC_OSC_WAVE_* (default: sine).
+   */
+  void setRingModulator(float carrierHz, float gain = 1.0f,
+                        uint8_t carrierWaveform = MIMIC_OSC_WAVE_SINE);
+
+  /**
+   * @brief PWM modulator (comparator against an internal carrier), digital output: HIGH while
+   *        the input is above the carrier. The duty cycle goes from 0 % at Vref - fullScaleV
+   *        to 100 % at Vref + fullScaleV (50 % at Vref).
+   * @param carrierHz PWM frequency in Hz. Each edge falls on a sample (5 us), so the duty
+   *        resolution is about carrierHz / 200 kHz (0.5 % at 1 kHz).
+   * @param fullScaleV Carrier amplitude in V. @param carrierWaveform MIMIC_OSC_WAVE_TRIANGLE
+   *        (default: both edges move) or MIMIC_OSC_WAVE_SAWTOOTH (one edge fixed).
+   */
+  void setPwmModulator(float carrierHz, float fullScaleV,
+                       uint8_t carrierWaveform = MIMIC_OSC_WAVE_TRIANGLE);
+
+  /**
+   * @brief V/F converter (LM331), digital output: a square wave (50 % duty) whose frequency
+   *        is zeroFreqHz + hzPerVolt * (in - Vref), limited to 0 - MIMIC_OSC_FREQ_MAX_HZ.
+   *        For a sensor whose zero is 0 V, call setVref(0.0f). Each edge falls on a sample,
+   *        so a single period varies by +/-5 us; the average frequency is exact.
+   * @param hzPerVolt Sensitivity in Hz/V. @param zeroFreqHz Frequency at Vref in Hz (default 0).
+   */
+  void setVfConverter(float hzPerVolt, float zeroFreqHz = 0.0f);
+
+  /**
+   * @brief Noise generator (input not used): out = Vref + noise.
+   * @param amplitudeV MIMIC_NOISE_WHITE: uniform within +/-amplitudeV (rms amplitudeV / sqrt 3).
+   *        MIMIC_NOISE_PINK: -3 dB/octave, rms amplitudeV / 3 (peaks beyond are clipped).
+   * @param color MIMIC_NOISE_WHITE (default) or MIMIC_NOISE_PINK.
+   * @note  At 200 kHz the pink spectrum holds from about 25 Hz to fs / 2 (Voss-McCartney,
+   *        12 rows); decimation moves the band down by 2^N.
+   */
+  void setNoise(float amplitudeV, uint8_t color = MIMIC_NOISE_WHITE);
 
   // --- Nonlinear: logarithm, multiplier, true RMS, dead zone ---
 
@@ -479,7 +532,8 @@ protected:
   void sendClipper(uint8_t type, float upperV, float lowerV);
   void sendIntegrator(uint8_t type, float k, float c);
   void sendMultiplier(uint8_t type, float unitV);
-  void sendOscillator(uint8_t type, float freqHz, float amplitudeV, float hzPerVolt, uint8_t waveform);
+  float oscFmGain(float hzPerVolt) const;
+  void sendOscillator(uint8_t mode, uint8_t waveform, float freqHz, float amplitudeV, float k);
 };
 
 // =========================================================
