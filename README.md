@@ -125,24 +125,28 @@ for (uint8_t ch = 0; ch < 8; ch++) {
 
 ## Examples
 
-| Example | What it shows |
-|---|---|
-| `BasicRead`, `ContinuousRead` | Reading the module input with `getAdcValue()` / `getInputVolts()` |
-| `Amplifier` | Bypass and the programmable gain amplifier |
-| `Filter1st` | First-order LPF / HPF / APF |
-| `FilterBiquad` | Second-order LPF / HPF (Bessel, Butterworth, Chebyshev), BPF, notch, APF |
-| `Comparator` | Schmitt trigger and window comparator (digital output) |
-| `Clipper` | Hard and soft clippers |
-| `ConstantVoltage` | A fixed output voltage |
-| `Rectifier` | Full-wave and half-wave rectifiers |
-| `Envelope` | Envelope follower and peak hold |
-| `Integrator`, `Differentiator` | Op-amp integrator and differentiator |
-| `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor |
-| `Decimation` | Running the processing at a lower rate |
-| `CpuCycles` | Processing time of each mode on the module |
-| `I2CScanner` | Finding the module address |
+The examples are grouped in three folders (in the Arduino IDE: *File -> Examples -> AnalogMimic*).
 
-The examples from `Amplifier` to `Modes` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope. Each example runs one demo from `setup()`; the other demos are listed there. The test signal frequency `SIGNAL_HZ` (100 Hz) sets every time and frequency of the demos.
+| Folder | Example | What it shows |
+|---|---|---|
+| `01.Basics` | `BasicRead` | Connecting to the module and reading its status |
+| | `ReadInput` | Reading the module input with `getAdcValue()` / `getInputVolts()` (Serial Plotter) |
+| | `Decimation` | Running the processing at a lower rate: every time constant is scaled by 2^N |
+| `02.Modes` | `Amplifier` | Bypass and the programmable gain amplifier |
+| | `Filter1st` | First-order LPF / HPF / APF |
+| | `FilterBiquad` | Second-order LPF / HPF (Bessel, Butterworth, Chebyshev), BPF, notch, APF |
+| | `Comparator` | Schmitt trigger and window comparator (digital output) |
+| | `Clipper` | Hard and soft clippers |
+| | `ConstantVoltage` | A fixed output voltage |
+| | `Rectifier` | Full-wave and half-wave rectifiers |
+| | `Envelope` | Envelope follower and peak hold |
+| | `Integrator`, `Differentiator` | Op-amp integrator and differentiator |
+| | `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor |
+| `03.Tools` | `CpuCycles` | Processing time of each mode on the module (deadline check) |
+| | `ContinuousRead` | Continuous I²C reads as a host load (used for the output timing measurements) |
+| | `I2CScanner` | Finding the module address |
+
+The examples in `02.Modes`, `ReadInput` and `Decimation` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope. Each example runs one demo from `setup()`; the other demos are listed there. The test signal frequency `SIGNAL_HZ` (100 Hz) sets every time and frequency of the demos.
 
 > **Note:** The edges of the test signal move by a few microseconds from one period to the next (timer interrupt latency of the Arduino). The module itself updates its output at a fixed time after each sample. Trigger the oscilloscope on the edge you are looking at.
 
@@ -186,7 +190,7 @@ This repository includes a PlatformIO setup for building and uploading the examp
 * Open the repository root folder (the one containing `platformio.ini`) in VS Code.
 
 ### Build / Upload the Example You Are Editing
-1. Open any example sketch, e.g. `examples/Modes/Modes.ino`.
+1. Open any example sketch, e.g. `examples/02.Modes/Modes/Modes.ino`.
 2. Press **Ctrl+Shift+B** (**Cmd+Shift+B** on macOS).
 3. Select one of the tasks:
    * **PIO: Build current example** — builds the example in the folder of the open `.ino` file.
@@ -202,7 +206,7 @@ pio run                       # Build all examples
 ```
 
 ### Adding a New Example
-1. Create `examples/<Name>/<Name>.ino` (the folder and sketch names must match).
+1. Create `examples/<group>/<Name>/<Name>.ino` (the folder and sketch names must match; sketch names must be unique across the groups).
 2. Add an environment to `platformio.ini`:
 ```ini
    [env:<Name>]
@@ -212,9 +216,9 @@ pio run                       # Build all examples
    
 
 ### Mode Examples and the Modes Sketch
-`examples/Modes/Modes.ino` is **generated** from the demos of the mode examples (`Amplifier` ... `Differentiator`, listed in `extras/gen_modes.py`). A demo is a function marked with `// @demo <description>` that uses only `mimic`, `testSignal`, `SIGNAL_HZ` and the library constants. After changing a mode example, regenerate and commit `Modes.ino` too:
+`examples/02.Modes/Modes/Modes.ino` is **generated** from the demos of the mode examples (`Amplifier` ... `Differentiator`, listed in `extras/gen_modes.py`). A demo is a function marked with `// @demo <description>` that uses only `mimic`, `testSignal`, `SIGNAL_HZ` and the library constants. After changing a mode example, regenerate and commit `Modes.ino` too:
 ```sh
-python extras/gen_modes.py          # regenerate examples/Modes/Modes.ino
+python extras/gen_modes.py          # regenerate examples/02.Modes/Modes/Modes.ino
 python extras/gen_modes.py --check  # fails if Modes.ino is out of date (also run by CI)
 ```
 Do not edit `Modes.ino` by hand. To test every mode, upload `Modes` and type the keys in the serial monitor.

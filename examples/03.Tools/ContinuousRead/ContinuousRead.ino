@@ -1,6 +1,9 @@
 /*
  * ContinuousRead - I2C load test for Analog Mimic
  *
+ * Used for the "host active" measurements of the paper on the output timing
+ * (analog-mimic, tag paper-v1). Kept as it was for reproducibility.
+ *
  * Drives back-to-back status reads over I2C so that the emulator can be
  * observed under sustained host traffic. Intended for the "host active"
  * measurement condition: the sample engine keeps running while the bus is

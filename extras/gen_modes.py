@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates examples/Modes/Modes.ino from the demos of the mode examples.
+"""Generates examples/02.Modes/Modes/Modes.ino from the demos of the mode examples.
 
 Each mode example (SKETCHES below) has its demos as functions marked with a comment:
 
@@ -14,7 +14,7 @@ and ends with a "}" at the start of a line. Modes.ino gets every demo, renamed
 <Sketch>_<function>, and a menu: type a key in the serial monitor to run a demo.
 
 Usage:
-    python extras/gen_modes.py          # writes examples/Modes/Modes.ino
+    python extras/gen_modes.py          # writes examples/02.Modes/Modes/Modes.ino
     python extras/gen_modes.py --check  # fails if Modes.ino is not up to date
 """
 import pathlib
@@ -37,7 +37,8 @@ SKETCHES = [
 KEYS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUT = ROOT / "examples" / "Modes" / "Modes.ino"
+MODES_DIR = ROOT / "examples" / "02.Modes"
+OUT = MODES_DIR / "Modes" / "Modes.ino"
 
 DEMO_RE = re.compile(r"^// @demo ([^\n]+)\n(void (\w+)\(\) \{\n.*?^\}\n)", re.M | re.S)
 
@@ -134,7 +135,7 @@ def generate():
     parts = [HEADER.format(names=", ".join(SKETCHES))]
     table = []
     for name in SKETCHES:
-        path = ROOT / "examples" / name / f"{name}.ino"
+        path = MODES_DIR / name / f"{name}.ino"
         src = path.read_text(encoding="utf-8").replace("\r\n", "\n")
         demos = DEMO_RE.findall(src)
         if not demos:
@@ -155,7 +156,7 @@ def main():
     if "--check" in sys.argv[1:]:
         current = OUT.read_text(encoding="utf-8").replace("\r\n", "\n") if OUT.exists() else ""
         if current != text:
-            sys.exit("examples/Modes/Modes.ino is not up to date: run python extras/gen_modes.py")
+            sys.exit("examples/02.Modes/Modes/Modes.ino is not up to date: run python extras/gen_modes.py")
         print("Modes.ino is up to date")
         return
     OUT.parent.mkdir(parents=True, exist_ok=True)
