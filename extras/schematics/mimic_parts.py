@@ -24,8 +24,9 @@ def setup_drawing(**kwargs):
     return d
 
 
-def mimic(label="Analog Mimic"):
-    """Analog Mimic module (Mimic01).
+def mimic0x(label="Mimic0x"):
+    """Analog Mimic module of the Mimic0x family (Mimic00, Mimic01, ...).
+    Other families get their own function (e.g. mimic1x()).
 
     left (host side), from the top: VCC, GND, SDA, SCL, AOUT
         (level with 5V, GND, SDA, SCL, A0 of uno_r4(), so the wires are straight);
@@ -55,7 +56,7 @@ def uno_r4(label="Arduino UNO R4", extra_pins=()):
     """Arduino UNO R4 (Minima / WiFi) with the pins used by the examples.
 
     Anchors: A0, SCL, SDA, GND, 5V (right), level with AOUT, SCL, SDA, GND, VCC of
-    mimic() so that the wires are straight when the two blocks are side by side.
+    mimic0x() so that the wires are straight when the two blocks are side by side.
     extra_pins: more pins on the right side, e.g. ("D2",), listed above A0.
     """
     names = ["A0", "SCL", "SDA", "GND", "5V"]
@@ -73,7 +74,7 @@ def probe(label):
 def sensor3(label="Sensor"):
     """A 3-pin sensor module (signal, supply, ground) for the analog input header.
 
-    Anchors: OUT, V, GND (left), in the same order as the header of mimic(), so
+    Anchors: OUT, V, GND (left), in the same order as the header of mimic0x(), so
     that the wires are straight when it is placed to the right of the module.
     """
     pins = [

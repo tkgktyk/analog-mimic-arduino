@@ -6,12 +6,12 @@ an oscilloscope shows the input (CH1) and the module output AOUT (CH2).
 import sys
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from mimic_parts import setup_drawing, mimic, uno_r4, probe
+from mimic_parts import setup_drawing, mimic0x, uno_r4, probe
 import schemdraw.elements as elm
 
 with setup_drawing(show=False) as d:
     uno = d.add(uno_r4())
-    m = d.add(mimic().anchor("SCL").at((uno.SCL[0] + 6, uno.SCL[1])))
+    m = d.add(mimic0x().anchor("SCL").at((uno.SCL[0] + 6, uno.SCL[1])))
     for a, b in [("SCL", "SCL"), ("SDA", "SDA"), ("GND", "GND"), ("5V", "VCC")]:
         d.add(elm.Wire("-").at(getattr(uno, a)).to(getattr(m, b)))
 
