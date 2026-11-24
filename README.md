@@ -146,7 +146,11 @@ The examples are grouped in three folders (in the Arduino IDE: *File -> Examples
 | | `ContinuousRead` | Continuous I²C reads as a host load (used for the output timing measurements) |
 | | `I2CScanner` | Finding the module address |
 
-The examples in `02.Modes`, `ReadInput` and `Decimation` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope. Each example runs one demo from `setup()`; the other demos are listed there. The test signal frequency `SIGNAL_HZ` (100 Hz) sets every time and frequency of the demos.
+The examples in `02.Modes`, `ReadInput` and `Decimation` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope.
+
+![Wiring of the examples: UNO R4 5V, GND, SDA, SCL to the module VCC, GND, SDA, SCL; A0 to the module AIN (oscilloscope CH1); module AOUT to oscilloscope CH2](extras/schematics/wiring_uno_r4.svg)
+
+Supply the module from **VCC** (it has reverse-polarity protection). The I²C pull-up resistors are on the module. The middle pin **V** of the 3-pin analog input header (AIN, V, GND) is a supply output for a sensor (VCC after the protection): do not supply the module from it, nor from the V pad of the SWD header. Each example runs one demo from `setup()`; the other demos are listed there. The test signal frequency `SIGNAL_HZ` (100 Hz) sets every time and frequency of the demos.
 
 > **Note:** The edges of the test signal move by a few microseconds from one period to the next (timer interrupt latency of the Arduino). The module itself updates its output at a fixed time after each sample. Trigger the oscilloscope on the edge you are looking at.
 
@@ -222,3 +226,9 @@ python extras/gen_modes.py          # regenerate examples/02.Modes/Modes/Modes.i
 python extras/gen_modes.py --check  # fails if Modes.ino is out of date (also run by CI)
 ```
 Do not edit `Modes.ino` by hand. To test every mode, upload `Modes` and type the keys in the serial monitor.
+
+### Schematics
+The drawings in `extras/schematics/` are made with [schemdraw](https://schemdraw.readthedocs.io/) (`pip install schemdraw`). `mimic_parts.py` draws the module and the host boards as blocks with their pins; each drawing is a short script next to its `.svg`. After changing a script or a pin in `mimic_parts.py`, regenerate the drawing and commit the `.svg` too:
+```sh
+python extras/schematics/wiring_uno_r4.py
+```
