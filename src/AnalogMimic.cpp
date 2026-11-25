@@ -380,7 +380,7 @@ void MimicBase::setComparatorSchmitt(float upperV, float lowerV) { sendComparato
 
 // --- Envelope, peak hold, sample & hold ---
 
-// Payload: [0-1] 1 - decay mant12, [2] polarity, [3] 1 - decay shift (0 = peak hold)
+// Payload: [0] polarity, [1-2] 1 - decay mant12, [3] 1 - decay shift (0 = peak hold)
 void MimicBase::setEnvelopeFollower(float decayTimeUs, uint8_t polarity) {
     float c = (decayTimeUs <= 0.0f) ? 1.0f : decayComplement(decayTimeUs);   // <= 0: no hold
     uint16_t mant;

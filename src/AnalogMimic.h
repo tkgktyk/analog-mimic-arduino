@@ -250,13 +250,16 @@ public:
 
   /**
    * @brief Envelope follower (AM detector): follows the peak above Vref (positive) or
-   *        below Vref (negative) and decays toward Vref.
+   *        below Vref (negative) and decays toward Vref. The output is on the side of the
+   *        peak, like a detector with the diode reversed: Vref + peak (positive),
+   *        Vref - peak (negative; firmware 20261123 and earlier: Vref + peak).
    * @param decayTimeUs Decay time constant in us (RC of the detector).
    * @param polarity MIMIC_POLARITY_POSITIVE or MIMIC_POLARITY_NEGATIVE.
    */
   void setEnvelopeFollower(float decayTimeUs, uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
-  /** @brief Peak hold (envelope follower without decay). @param polarity MIMIC_POLARITY_*. */
+  /** @brief Peak hold (envelope follower without decay); the peak is kept until the mode
+   *         changes. @param polarity MIMIC_POLARITY_* (negative: holds the lowest value). */
   void setPeakHold(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
   // --- 5. Clippers ---
