@@ -163,6 +163,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
+| 0.2.1 | 20261125 or later | Examples in three groups (01.Basics, 02.Modes, 03.Tools); wiring diagram; with firmware 20261125: the integrator / differentiator reach the analog response for a large DC gain or a fast edge and stop at the output range like an op-amp, and the negative envelope / peak hold outputs Vref − peak (the API is unchanged) |
 | 0.2.0 | 20261123 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants; constant voltage; new mode payloads; examples per mode with a test signal (UNO R4) |
 | 0.1.0 | 20261025 - 20261030 | First release |
 
