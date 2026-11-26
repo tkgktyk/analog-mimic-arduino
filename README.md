@@ -154,6 +154,10 @@ Supply the module from **VCC** (it has reverse-polarity protection). The I²C pu
 
 > **Note:** The edges of the test signal move by a few microseconds from one period to the next (timer interrupt latency of the Arduino). The module itself updates its output at a fixed time after each sample. Trigger the oscilloscope on the edge you are looking at.
 
+### Lectures and projects
+
+Lectures on analog signal processing with the module are in [analog-mimic-examples](https://github.com/tkgktyk/analog-mimic-examples) (in Japanese): Jupyter notebooks with an Arduino UNO R4 as the instrument (signal generator and two-channel oscilloscope), one circuit per lecture from the amplifier to the filters, the integrator / differentiator and the nonlinear circuits. Projects with sensors will be added there too.
+
 ---
 
 ## Releases and Firmware Compatibility
