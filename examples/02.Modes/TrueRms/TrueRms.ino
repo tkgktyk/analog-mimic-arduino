@@ -5,7 +5,7 @@
 // The demo runs from setup(); loop() is empty. Pick another demo in setup().
 // All the demos of all the examples are in the Modes example.
 //
-// The output is a magnitude from 0 V. Use it without decimation.
+// The output is a magnitude from 0 V.
 
 #include <Wire.h>
 #include <AnalogMimic.h>

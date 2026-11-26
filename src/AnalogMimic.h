@@ -477,8 +477,8 @@ public:
    *        response time.
    * @param averagingTimeUs Averaging time constant in us
    *        (MIMIC_TRUE_RMS_TIME_MIN_US - MIMIC_TRUE_RMS_TIME_MAX_US).
-   * @note  Use it without decimation: decimation averages the input before the DSP, and
-   *        the processing does not fit in one sample period.
+   * @note  With decimation, the input is averaged over 2^N samples before the DSP (as for
+   *        every mode), so components near or above 100 kHz / 2^N are reduced.
    */
   void setTrueRms(float averagingTimeUs);
 
