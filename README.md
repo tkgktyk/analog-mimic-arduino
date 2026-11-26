@@ -67,8 +67,10 @@ Every function uses the same units, chosen like the datasheet of the analog part
 | Quantity | Unit | Examples |
 |---|---|---|
 | Voltage | V (`float`) | `setVref(2.5f)`, `setComparatorSchmitt(3.0f, 2.0f)`, `setClipper(4.0f, 1.0f)` |
-| Time | µs | `setEnvelopeFollower(50000.0f)` (50 ms), `setIntegrator(1000.0f, 100000.0f)` |
-| Frequency | Hz | `setFilterBiquadLPF(1000.0f)`, `setFilter1stHPF(10.0f)` |
+| Time | µs | `setEnvelopeFollower(50000.0f)` (50 ms), `setIntegrator(1000.0f, 100000.0f)`, `setTrueRms(100000.0f)` |
+| Frequency | Hz | `setFilterBiquadLPF(1000.0f)`, `setFilter1stHPF(10.0f)`, `setOscillator(1000.0f, 1.0f)` |
+| Slew rate | V/µs | `setSlewRateLimiter(0.001f)` (1 V/ms) |
+| Sensitivity | Hz/V, V/decade | `setVco(500.0f, 200.0f, 1.0f)`, `setLog(1.0f, 0.5f)` |
 | Gain, Q, ratios | none | `setPGA(2.0f)`, `setFilterBiquadBPF(1000.0f, 5.0f)` |
 
 ### Voltages are relative to the supply (ratiometric)
@@ -79,8 +81,9 @@ Voltages are converted with the supply voltage given to the constructor. If the 
 Inside the module, voltages are codes with 1/8 LSB resolution (`raw_fx3`, 1 code = VDD / 32768). `voltsToCode()` and `codeToVolts()` convert between them; `getAdcValue()` and `setVrefCode()` work with codes directly (for calibration and testing).
 
 ### Absolute voltages and the common reference (Vref)
-* **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()`.
-* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, integrator / differentiator.
+* **Thresholds and limits are absolute** (measured from GND): `setComparatorWindow()`, `setComparatorSchmitt()`, `setClipper()`, `setSoftClipper()`, `setDeadZone()`.
+* **Every input is taken relative to Vref.** Modes with a signed output work as `out = Vref + H(in - Vref)`: PGA, filters, rectifiers, envelope follower, integrator / differentiator, log amplifier, modulators. The VCO, the PWM modulator and the V/F converter take their input from Vref too; the oscillator and the noise generator output around Vref.
+* **Some outputs are magnitudes from 0 V:** antilog amplifier, squarer, square rooter and true RMS. The lowest 0.1 V or so cannot be output (supply headroom); lift the output with `setOutputOffset()` when you need to see it.
 * **Chaining modules:** set the Vref of the next module to the level that the previous module outputs for a zero signal (its Vref plus its output offset), so that the offset cancels.
 * Vref defaults to **VDD / 2** after `begin()`. Change it with `setVref(volts)` (for example, `setVref(0.0f)` for a single-supply signal referenced to GND).
 * Changing Vref does not reset the state of filters and other modes, so the output moves smoothly, like an analog circuit whose reference has shifted.
@@ -105,6 +108,9 @@ The register map is shared between the firmware and this library (`mimic_registe
 Serial.println(mimic.getBuildDate(), HEX);   // e.g. 20261031
 Serial.println(mimic.getUnitId(), HEX);      // ID of this module
 ```
+
+### Experimental functions
+Functions that are implemented in the firmware but not yet verified on hardware are released first as experimental, through `AnalogMimicExperimental.h`: `MimicExperimental<Mimic0x> mimic(MIMIC_VDD_5V);` has every function of `Mimic0x` plus the experimental ones (now only `setTestPadOutput()`). Their API may change; once verified by a lecture or an example, they move to `AnalogMimic.h`, and sketches using `MimicExperimental<>` keep working.
 
 ### I²C address
 The module answers at 0x40 - 0x43, selected by the A1 / A0 solder jumpers on the bottom side (read at power-up). Pass the offset to the constructor: `Mimic0x mimic(MIMIC_VDD_5V, 1);` for 0x41. The `I2CScanner` example lists the modules on the bus (on the UNO R4, a scanner that sends only the address finds a device at every address: probe with one byte, as the example does).
@@ -136,12 +142,23 @@ The examples are grouped in three folders (in the Arduino IDE: *File -> Examples
 | | `Filter1st` | First-order LPF / HPF / APF |
 | | `FilterBiquad` | Second-order LPF / HPF (Bessel, Butterworth, Chebyshev), BPF, notch, APF |
 | | `Comparator` | Schmitt trigger and window comparator (digital output) |
-| | `Clipper` | Hard and soft clippers |
+| | `Clipper` | Hard and soft clippers, dead zone |
 | | `ConstantVoltage` | A fixed output voltage |
 | | `Rectifier` | Full-wave and half-wave rectifiers |
 | | `Envelope` | Envelope follower and peak hold |
 | | `Integrator`, `Differentiator` | Op-amp integrator and differentiator |
-| | `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor |
+| | `SampleHold` | Sample & hold, track & hold, aliasing |
+| | `SlewRate` | Slew rate limiter (like the slew rate of an op-amp) |
+| | `Delay` | Delay line (dead time) |
+| | `Oscillator` | Function generator: sine, triangle, square, sawtooth |
+| | `Vco` | Voltage-controlled oscillator |
+| | `Noise` | White and pink noise |
+| | `Modulator` | AM and ring (balanced) modulators |
+| | `Pwm`, `VfConverter` | PWM modulator and V/F converter (digital output) |
+| | `Logarithm` | Logarithmic and antilogarithmic (exponential) amplifiers |
+| | `Multiplier` | Squarer and square rooter |
+| | `TrueRms` | True RMS-to-DC converter |
+| | `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor (the keys are case-sensitive) |
 | `03.Tools` | `CpuCycles` | Processing time of each mode on the module (deadline check) |
 | | `ContinuousRead` | Continuous I²C reads as a host load (used for the output timing measurements) |
 | | `I2CScanner` | Finding the modules (0x40 - 0x43) and checking that they answer as a Mimic |
@@ -156,7 +173,7 @@ Supply the module from **VCC** (it has reverse-polarity protection). The I²C pu
 
 ### Lectures and projects
 
-Lectures on analog signal processing with the module are in [analog-mimic-examples](https://github.com/tkgktyk/analog-mimic-examples) (in Japanese): Jupyter notebooks with an Arduino UNO R4 as the instrument (signal generator and two-channel oscilloscope), one circuit per lecture from the amplifier to the filters, the integrator / differentiator and the nonlinear circuits. Projects with sensors will be added there too.
+Lectures on analog signal processing with the module are in [analog-mimic-examples](https://github.com/tkgktyk/analog-mimic-examples) (in Japanese): Jupyter notebooks with an Arduino UNO R4 as the instrument (signal generator and two-channel oscilloscope), one circuit per lecture for every mode: amplifiers, filters, time (integrator, sample & hold, delay), nonlinear circuits, sources and modulators, and computation (log, squarer, true RMS). Projects with sensors will be added there too.
 
 ---
 
@@ -167,6 +184,7 @@ Use a library release together with firmware built within the range listed for i
 
 | Library | Firmware build date | Notes |
 |---|---|---|
+| 0.3.0 | 20261125 or later | Every mode is released: sample & hold / track & hold, slew rate limiter, delay, oscillator, VCO, noise, AM / ring modulator, PWM modulator, V/F converter, log / antilog, squarer / square rooter, true RMS, dead zone; an example for each; the period of the sample & hold is rounded to the nearest sample (it was truncated); `I2CScanner` probes with one byte (UNO R4) |
 | 0.2.1 | 20261125 or later | Examples in three groups (01.Basics, 02.Modes, 03.Tools); wiring diagram; with firmware 20261125: the integrator / differentiator reach the analog response for a large DC gain or a fast edge and stop at the output range like an op-amp, and the negative envelope / peak hold outputs Vref − peak (the API is unchanged) |
 | 0.2.0 | 20261123 or later | Voltages in V, slew rate in V/µs, decimation scales time; all-pass filters and soft clipper; integrator / differentiator with analog time constants; constant voltage; new mode payloads; examples per mode with a test signal (UNO R4) |
 | 0.1.0 | 20261025 - 20261030 | First release |
@@ -184,7 +202,7 @@ Firmware: [tkgktyk/analog-mimic](https://github.com/tkgktyk/analog-mimic) (the `
 * **Voltages are in V, not mV:** the constructor (`Mimic0x mimic(5.0f)`, or `MIMIC_VDD_5V`, which is now 5.0f) and every voltage argument. A sketch that still passes mV compiles, so check every call: `setVref(2500)` must become `setVref(2.5f)`.
 * `setDecimation()` no longer changes the meaning of the settings: times and frequencies of the module are scaled by 2^N.
 * `setMathDerivative()` and `setMathIntegral()` are replaced by `setDifferentiator(differentiationTimeUs, limitTimeUs)` and `setIntegrator(integrationTimeUs, leakTimeUs)`, which take the time constants of the analog circuit in µs.
-* The log / antilog, sample & hold, track & hold, slew rate limiter and delay modes of 0.1.0 are not in this release. They will return, with the units above, in a later release.
+* The log / antilog, sample & hold, track & hold, slew rate limiter and delay modes of 0.1.0 returned in 0.3.0 with the units above (`setLog()`, `setAntilog()`, `setSampleAndHold()`, `setTrackAndHold()`, `setSlewRateLimiter()`, `setDigitalDelay()`).
 * `getAdcValue()` returns a code with 1/8 LSB resolution (ADC code × 8); `getInputVolts()` returns volts.
 * The second constructor argument is the I²C address offset (0 - 3).
 
@@ -222,10 +240,10 @@ pio run                       # Build all examples
    custom_example = <Name>
 ```
    This is only required for command-line builds and `pio run`. The **Ctrl+Shift+B** tasks work without it.
-   
+   
 
 ### Mode Examples and the Modes Sketch
-`examples/02.Modes/Modes/Modes.ino` is **generated** from the demos of the mode examples (`Amplifier` ... `Differentiator`, listed in `extras/gen_modes.py`). A demo is a function marked with `// @demo <description>` that uses only `mimic`, `testSignal`, `SIGNAL_HZ` and the library constants. After changing a mode example, regenerate and commit `Modes.ino` too:
+`examples/02.Modes/Modes/Modes.ino` is **generated** from the demos of the mode examples (`Amplifier` ... `TrueRms`, listed in `extras/gen_modes.py`; up to 62 demos, keys 0-9, a-z, A-Z). A demo is a function marked with `// @demo <description>` that uses only `mimic`, `testSignal`, `SIGNAL_HZ` and the library constants. After changing a mode example, regenerate and commit `Modes.ino` too:
 ```sh
 python extras/gen_modes.py          # regenerate examples/02.Modes/Modes/Modes.ino
 python extras/gen_modes.py --check  # fails if Modes.ino is out of date (also run by CI)

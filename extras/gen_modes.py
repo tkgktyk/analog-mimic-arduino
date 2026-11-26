@@ -33,8 +33,20 @@ SKETCHES = [
     "Envelope",
     "Integrator",
     "Differentiator",
+    "SampleHold",
+    "SlewRate",
+    "Delay",
+    "Oscillator",
+    "Vco",
+    "Noise",
+    "Modulator",
+    "Pwm",
+    "VfConverter",
+    "Logarithm",
+    "Multiplier",
+    "TrueRms",
 ]
-KEYS = "0123456789abcdefghijklmnopqrstuvwxyz"
+KEYS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"   # case-sensitive
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODES_DIR = ROOT / "examples" / "02.Modes"
@@ -50,7 +62,8 @@ HEADER = """\
 //
 // Wiring: Arduino UNO R4 A0 -> module IN, SDA / SCL / 5V / GND -> module.
 // Look at the module OUT (and at A0 for the input) with an oscilloscope.
-// Open the serial monitor (115200 baud) and type a key to run a demo; ? shows the menu.
+// Open the serial monitor (115200 baud) and type a key (case-sensitive) to run a demo;
+// ? shows the menu.
 
 #include <Wire.h>
 #include <AnalogMimic.h>
@@ -116,7 +129,6 @@ void loop() {{
     printMenu();
     return;
   }}
-  if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
   for (int i = 0; i < NUM_DEMOS; i++) {{
     if (KEYS[i] == c) {{
       runDemo(i);

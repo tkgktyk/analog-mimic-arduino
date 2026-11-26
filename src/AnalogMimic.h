@@ -325,37 +325,7 @@ public:
    */
   void setRectifierFull(uint8_t polarity = MIMIC_POLARITY_POSITIVE);
 
-  // --- Calibration (output gain and offset, stored in the module's flash) ---
-
-  /**
-   * @brief Sets the output gain calibration (RAM; use commitCalibrationToNvm() to store).
-   * @param gain Gain multiplier (e.g., 1.0023), 0 to < 2.0.
-   */
-  void setGainCal(float gain);
-
-  /**
-   * @brief Sets the output offset calibration (RAM; use commitCalibrationToNvm() to store).
-   * @param offsetLsb Offset in output LSB (VDD / 4096, e.g. -6.44); resolution 1/8 LSB.
-   */
-  void setOffsetCal(float offsetLsb);
-
-  /** @brief Stores the calibration in RAM to the module's flash. */
-  void commitCalibrationToNvm();
-
-  /** @brief Reloads the calibration from the module's flash. */
-  void reloadCalibrationFromNvm();
-
-protected:
-  MimicBase(float vddV, uint8_t addressOffset = 0);
-
-  // ===================================================================================
-  // Experimental modes
-  //   Implemented in the firmware, but not yet verified on hardware and in application
-  //   examples. They are public in MimicExperimental<> (AnalogMimicExperimental.h);
-  //   the API may change before they are released here.
-  // ===================================================================================
-
-  // --- Time: sample & hold, slew rate, delay ---
+  // --- 7. Time: sample & hold, slew rate, delay ---
 
   /** @brief Sample and hold. @param freqHz Sampling frequency in Hz. */
   void setSampleAndHold(float freqHz);
@@ -380,7 +350,7 @@ protected:
    */
   void setDigitalDelay(uint16_t delaySamples);
 
-  // --- Signal sources and modulators ---
+  // --- 8. Signal sources and modulators ---
 
   /**
    * @brief Oscillator (function generator): out = Vref + amplitude * wave(2 pi f t).
@@ -459,19 +429,7 @@ protected:
    */
   void setNoise(float amplitudeV, uint8_t color = MIMIC_NOISE_WHITE);
 
-  // --- Test pad ---
-
-  /**
-   * @brief Selects the signal on the test pad (PA2 on mimic01).
-   * @param source MIMIC_TEST_PAD_OFF (not driven, after begin()) or
-   *        MIMIC_TEST_PAD_SAMPLE_CLOCK: a 100 kHz square wave that toggles at every sample,
-   *        a reference for the output timing (with an oscillator square at
-   *        MIMIC_OSC_FREQ_MAX_HZ on the analog output, or a V/F converter at that frequency
-   *        on the digital output, the output also changes at every sample).
-   */
-  void setTestPadOutput(uint8_t source);
-
-  // --- Nonlinear: logarithm, multiplier, true RMS, dead zone ---
+  // --- 9. Computation: logarithm, multiplier, true RMS; dead zone ---
 
   /**
    * @brief Logarithmic amplifier: out = Vref + slope * log10((in - Vref) / unit).
@@ -531,6 +489,48 @@ protected:
    * @param upperV Upper limit in V. @param lowerV Lower limit in V (absolute, like setClipper()).
    */
   void setDeadZone(float upperV, float lowerV);
+
+  // --- Calibration (output gain and offset, stored in the module's flash) ---
+
+  /**
+   * @brief Sets the output gain calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param gain Gain multiplier (e.g., 1.0023), 0 to < 2.0.
+   */
+  void setGainCal(float gain);
+
+  /**
+   * @brief Sets the output offset calibration (RAM; use commitCalibrationToNvm() to store).
+   * @param offsetLsb Offset in output LSB (VDD / 4096, e.g. -6.44); resolution 1/8 LSB.
+   */
+  void setOffsetCal(float offsetLsb);
+
+  /** @brief Stores the calibration in RAM to the module's flash. */
+  void commitCalibrationToNvm();
+
+  /** @brief Reloads the calibration from the module's flash. */
+  void reloadCalibrationFromNvm();
+
+protected:
+  MimicBase(float vddV, uint8_t addressOffset = 0);
+
+  // ===================================================================================
+  // Experimental
+  //   Implemented in the firmware, but not yet verified on hardware and in application
+  //   examples. Public in MimicExperimental<> (AnalogMimicExperimental.h); the API may
+  //   change before it is released here.
+  // ===================================================================================
+
+  // --- Test pad ---
+
+  /**
+   * @brief Selects the signal on the test pad (PA2 on mimic01).
+   * @param source MIMIC_TEST_PAD_OFF (not driven, after begin()) or
+   *        MIMIC_TEST_PAD_SAMPLE_CLOCK: a 100 kHz square wave that toggles at every sample,
+   *        a reference for the output timing (with an oscillator square at
+   *        MIMIC_OSC_FREQ_MAX_HZ on the analog output, or a V/F converter at that frequency
+   *        on the digital output, the output also changes at every sample).
+   */
+  void setTestPadOutput(uint8_t source);
 
   uint8_t _i2c_addr;
   TwoWire *_wire;

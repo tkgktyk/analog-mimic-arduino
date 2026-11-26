@@ -2,7 +2,7 @@
  ******************************************************************************
  * @file    AnalogMimicExperimental.h
  * @author  TAKAGI Katsuyuki
- * @brief   Experimental modes of the Analog Mimic module.
+ * @brief   Experimental functions of the Analog Mimic module.
  *-----------------------------------------------------------------------------
  * Copyright (C) 2026 TAKAGI Katsuyuki
  *
@@ -10,15 +10,18 @@
  * https://opensource.org/licenses/MIT
  ******************************************************************************
  *
- * These modes are implemented in the firmware, but not yet verified on hardware and in
- * application examples. Their API may change (or they may be removed) before they are
- * released in AnalogMimic.h. The functions are documented in AnalogMimic.h.
+ * Experimental functions are implemented in the firmware, but not yet verified on hardware
+ * and in application examples. Their API may change (or they may be removed) before they
+ * are released in AnalogMimic.h. The functions are documented in AnalogMimic.h.
+ *
+ * In 0.3.0 every mode was released; only the test pad is experimental now. New
+ * functions will come here first.
  *
  * Usage:
  *   #include <AnalogMimicExperimental.h>
  *   MimicExperimental<Mimic0x> mimic(MIMIC_VDD_5V);   // every function of Mimic0x, too
  *
- * When a mode is released, its function becomes public in MimicBase and its line here
+ * When a function is released, it becomes public in MimicBase and its line here
  * is removed; sketches using MimicExperimental<> keep working unchanged.
  */
 
@@ -33,31 +36,8 @@ class MimicExperimental : public Base
 public:
   using Base::Base;
 
-  // Time: sample & hold, slew rate, delay
-  using Base::setSampleAndHold;
-  using Base::setTrackAndHold;
-  using Base::setSlewRateLimiter;
-  using Base::setDigitalDelay;
-
-  // Signal sources and modulators
-  using Base::setOscillator;
-  using Base::setVco;
-  using Base::setAmModulator;
-  using Base::setRingModulator;
-  using Base::setPwmModulator;
-  using Base::setVfConverter;
-  using Base::setNoise;
-
   // Test pad
   using Base::setTestPadOutput;
-
-  // Nonlinear: logarithm, multiplier, true RMS, dead zone
-  using Base::setLog;
-  using Base::setAntilog;
-  using Base::setSquarer;
-  using Base::setSquareRooter;
-  using Base::setTrueRms;
-  using Base::setDeadZone;
 };
 
 #endif // ANALOG_MIMIC_EXPERIMENTAL_H

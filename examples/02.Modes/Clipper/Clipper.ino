@@ -1,4 +1,4 @@
-// Clipper: hard and soft clippers
+// Clipper: hard and soft clippers, dead zone
 //
 // Wiring: Arduino UNO R4 A0 -> module IN, SDA / SCL / 5V / GND -> module.
 // Look at the module OUT (and at A0 for the input) with an oscilloscope.
@@ -21,7 +21,7 @@ void setup() {
     while (1);
   }
   hardClip();
-  // or: softClip()
+  // or: softClip(), deadZone()
 }
 
 void loop() {}
@@ -36,4 +36,10 @@ void hardClip() {
 void softClip() {
   testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
   mimic.setSoftClipper(3.0f, 2.0f);
+}
+
+// @demo Sine -> dead zone (3.0 V / 2.0 V): only the parts beyond the limits pass
+void deadZone() {
+  testSignal.begin(MimicTestSignal::SINE, SIGNAL_HZ);
+  mimic.setDeadZone(3.0f, 2.0f);
 }
