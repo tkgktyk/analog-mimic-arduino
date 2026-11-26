@@ -107,7 +107,7 @@ Serial.println(mimic.getUnitId(), HEX);      // ID of this module
 ```
 
 ### I²C address
-The module answers at 0x40 - 0x43, selected by the A1 / A0 solder jumpers on the bottom side (read at power-up). Pass the offset to the constructor: `Mimic0x mimic(MIMIC_VDD_5V, 1);` for 0x41.
+The module answers at 0x40 - 0x43, selected by the A1 / A0 solder jumpers on the bottom side (read at power-up). Pass the offset to the constructor: `Mimic0x mimic(MIMIC_VDD_5V, 1);` for 0x41. The `I2CScanner` example lists the modules on the bus (on the UNO R4, a scanner that sends only the address finds a device at every address: probe with one byte, as the example does).
 
 ### Reading the module output with the host ADC
 The module output has a series resistor. Many microcontroller ADCs assume a low source impedance, so a short sampling time can make readings slightly low (for example, about 0.2 % on the Arduino UNO R4). If you measure the output with the host ADC, lengthen the sampling time or buffer the signal.
@@ -144,7 +144,7 @@ The examples are grouped in three folders (in the Arduino IDE: *File -> Examples
 | | `Modes` | All the demos of the examples above in one sketch: pick one from the serial monitor |
 | `03.Tools` | `CpuCycles` | Processing time of each mode on the module (deadline check) |
 | | `ContinuousRead` | Continuous I²C reads as a host load (used for the output timing measurements) |
-| | `I2CScanner` | Finding the module address |
+| | `I2CScanner` | Finding the modules (0x40 - 0x43) and checking that they answer as a Mimic |
 
 The examples in `02.Modes`, `ReadInput` and `Decimation` make their own test signal on the DAC pin (A0) of an **Arduino UNO R4** with the `MimicTestSignal` class (`#include <MimicTestSignal.h>`, UNO R4 only). Connect A0 to the module input and look at the module output with an oscilloscope.
 
