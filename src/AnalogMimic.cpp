@@ -83,7 +83,7 @@ static uint16_t periodSamples(float freqHz) {
     float n = MIMIC_SAMPLING_HZ / freqHz;
     if (n < 1.0f) n = 1.0f;
     if (n > 65535.0f) n = 65535.0f;
-    return (uint16_t)n;
+    return (uint16_t)lroundf(n);   // the nearest period (truncating made 1100 Hz 1105 Hz)
 }
 
 // =========================================================
