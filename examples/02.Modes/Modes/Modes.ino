@@ -208,6 +208,7 @@ void Envelope_peakHold() {
 void Integrator_integrator() {
   testSignal.begin(MimicTestSignal::SQUARE, SIGNAL_HZ);
   // 1.25 V for half a period ramps the output by about 2 V; the leak (10 periods) stops the drift
+  // DC gain 33: a few mV of input offset move the output centre by 0.1 - 0.2 V
   mimic.setIntegrator(3e5f / SIGNAL_HZ, 1e7f / SIGNAL_HZ);
 }
 
